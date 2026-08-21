@@ -53,18 +53,23 @@ export function encodeKintoneRecord(
 ): Readonly<Record<string, { readonly value: unknown }>> {
   const result: Record<string, { readonly value: unknown }> = {};
   for (const [name, value] of Object.entries(record)) {
-    if (name === "$id" || name === "$revision") {
+    const code = fieldCode(binding, name);
+    if (code === "$id" || code === "$revision") {
       continue;
     }
     const schemaField = schema?.fields.find((field) => field.name === name);
     if (schemaField?.mutable === false) {
       continue;
     }
-    result[fieldCode(binding, name)] = { value };
+    result[code] = { value };
   }
   return result;
 }
 
 export function kintoneFieldCode(binding: KintoneModelBinding, name: string): string {
   return fieldCode(binding, name);
+}
+
+export function kintoneFieldName(binding: KintoneModelBinding, code: string): string {
+  return fieldName(binding, code);
 }
