@@ -106,11 +106,13 @@ function resultSet(
 class HibariPrismaDriverAdapter implements SqlDriverAdapter {
   readonly provider = "sqlite" as const;
   readonly adapterName = "@hibari/prisma";
+  readonly #runtime: DatastoreRuntime;
+  readonly #schema: SchemaIR | undefined;
 
-  constructor(
-    readonly #runtime: DatastoreRuntime,
-    readonly #schema: SchemaIR | undefined
-  ) {}
+  constructor(runtime: DatastoreRuntime, schema: SchemaIR | undefined) {
+    this.#runtime = runtime;
+    this.#schema = schema;
+  }
 
   async queryRaw(query: SqlQuery): Promise<SqlResultSet> {
     const translated = translatePrismaSql({ sql: query.sql, args: query.args });
