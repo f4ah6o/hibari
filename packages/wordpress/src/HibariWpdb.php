@@ -39,6 +39,16 @@ class HibariWpdb extends \wpdb {
     }
 
     /**
+     * Native wpdb CRUD helpers consult MySQL column metadata to validate charset
+     * and length. Hibari has no MySQL connection; schema/backend validation owns
+     * those constraints. Preserve wpdb's value/format pairing so inherited
+     * update()/delete()/insert() can still generate their normal SQL boundary.
+     */
+    protected function process_fields($table, $data, $format) {
+        return $this->process_field_formats($data, $format);
+    }
+
+    /**
      * Route wpdb operations into the backend-neutral Hibari bridge.
      *
      * @param string $query
