@@ -1,4 +1,12 @@
-import type { Diagnostic, ExecutionPlan, ModelSchema, QueryIR } from "@hibari/core";
+import type {
+  DatastoreMutationResult,
+  DatastoreQueryResult,
+  Diagnostic,
+  ExecutionPlan,
+  ModelSchema,
+  QueryIR,
+  RecordValue
+} from "@hibari/core";
 
 export type KintoneAppId = string | number;
 
@@ -58,17 +66,10 @@ export interface KintoneQueryCompilation {
   readonly strategy: "records" | "offset" | "cursor";
 }
 
-export interface KintoneQueryResult<T = Readonly<Record<string, unknown>>> {
-  readonly records: readonly T[];
-  readonly plan: ExecutionPlan;
-}
+export interface KintoneQueryResult<T extends RecordValue = RecordValue>
+  extends DatastoreQueryResult<T> {}
 
-export interface KintoneMutationResult {
-  readonly affected: number;
-  readonly ids?: readonly string[];
-  readonly revisions?: readonly string[];
-  readonly plan: ExecutionPlan;
-}
+export interface KintoneMutationResult extends DatastoreMutationResult {}
 
 export interface KintonePreparedQuery {
   readonly operation: QueryIR;
