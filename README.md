@@ -11,7 +11,7 @@ consumer ----------------> @hibari/core <---------------- backend
    |                            ^                            |
    |                            |                            |
 @hibari/prisma                  |                    @hibari/kintone
-WordPress db.php -- bridge -----+
+WordPress db.php -> runtime HTTP+
 ```
 
 Consumers and backends depend on backend-neutral contracts. Consumer packages do not contain concrete backend APIs.
@@ -61,18 +61,40 @@ generated PrismaClient
 
 Application CRUD in that proof contains no kintone App ID, field code, `$id`, `$revision`, REST endpoint, or pagination logic.
 
+### `@hibari/runtime-http`
+
+- backend-neutral HTTP projection of `DatastoreRuntime`
+- `POST /v1/query` and `POST /v1/mutation`
+- structured diagnostics preserved across the transport
+- bounded request bodies
+- no SQL, WordPress, or concrete backend logic
+- proof-oriented loopback boundary; authentication/TLS/public deployment are intentionally not implied
+
 ### WordPress database drop-in
 
-The WordPress consumer boundary is proven against the stock WordPress 7.1 release without forking WordPress:
+The WordPress consumer is proven against the stock WordPress 7.1 release without forking WordPress:
 
 - `wp-content/db.php` installs `Hibari\WordPress\HibariWpdb`
 - the custom `wpdb` does not open a MySQL connection
 - inherited WordPress APIs such as `prepare()` and `get_row()` continue through the custom query boundary
-- stock Core `get_option()` crosses the Hibari bridge and returns bridge-backed data
+- WordPress owns WordPress SQL/table/column -> Hibari IR translation
 - JOIN / aggregate / transaction / DDL / subquery SQL is rejected early with stable `HIB-WP-*` diagnostics
-- the PHP consumer contains no kintone App ID, field code, revision, REST endpoint, or pagination logic
+- the PHP bridge contains no kintone App ID, field code, revision, REST endpoint, or pagination logic
 
-The next WordPress phase binds that PHP bridge to a backend-neutral Hibari runtime transport, then extends persistence to options, content, users, taxonomy, comments, and postmeta.
+The full integration proof is:
+
+```text
+stock WordPress 7.1 get_option()
+  -> db.php / HibariWpdb
+  -> WordPress SQL translator
+  -> PHP HTTP bridge
+  -> @hibari/runtime-http
+  -> @hibari/core
+  -> KintoneBackend
+  -> fake kintone REST
+```
+
+The next WordPress work expands from this read proof to WordPress-owned state changes, beginning with options read/write, then content, users, taxonomy, comments, and postmeta.
 
 ## Development
 
@@ -81,4 +103,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core contracts, kintone backend contracts, Prisma SQL/PrismaClient proofs, and the cross-package Prisma-to-kintone integration proof. CI additionally downloads the pinned stock WordPress 7.1 release and exercises the real `db.php` / `wpdb` boundary. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads the pinned stock WordPress 7.1 release and runs both the database-drop-in proof and the full WordPress-to-KintoneBackend runtime proof. Live kintone credentials are not required.
