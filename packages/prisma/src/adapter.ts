@@ -103,6 +103,50 @@ function resultSet(
   };
 }
 
+/**
+ * Prisma's SQLite query compiler may serialize bigint pagination arguments as
+ * decimal strings even though LIMIT/OFFSET are numeric SQL positions. Normalize
+ * only placeholders immediately following LIMIT/OFFSET; application string
+ * arguments remain untouched.
+ */
+function normalizePaginationArguments(sql: string, args: readonly unknown[]): readonly unknown[] {
+  const normalized = [...args];
+  let nextSequential = 0;
+  const placeholders = /\?(\d*)|\$(\d+)/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = placeholders.exec(sql)) !== null) {
+    const raw = match[0];
+    let argumentIndex: number;
+    if (raw === "?") {
+      argumentIndex = nextSequential;
+      nextSequential += 1;
+    } else {
+      const digits = raw.slice(1);
+      argumentIndex = Number(digits) - 1;
+    }
+
+    const prefix = sql.slice(Math.max(0, match.index - 32), match.index);
+    if (!/\b(?:LIMIT|OFFSET)\s*$/i.test(prefix)) {
+      continue;
+    }
+
+    const value = normalized[argumentIndex];
+    if (typeof value === "string" && /^-?\d+$/.test(value)) {
+      normalized[argumentIndex] = Number(value);
+    }
+  }
+
+  return normalized;
+}
+
+function translateDriverSql(query: SqlQuery) {
+  return translatePrismaSql({
+    sql: query.sql,
+    args: normalizePaginationArguments(query.sql, query.args)
+  });
+}
+
 class HibariPrismaDriverAdapter implements SqlDriverAdapter {
   readonly provider = "sqlite" as const;
   readonly adapterName = "@hibari/prisma";
@@ -115,7 +159,7 @@ class HibariPrismaDriverAdapter implements SqlDriverAdapter {
   }
 
   async queryRaw(query: SqlQuery): Promise<SqlResultSet> {
-    const translated = translatePrismaSql({ sql: query.sql, args: query.args });
+    const translated = translateDriverSql(query);
 
     if (translated.operation.kind === "query") {
       const result = await this.#runtime.query(translated.operation);
@@ -158,7 +202,7 @@ class HibariPrismaDriverAdapter implements SqlDriverAdapter {
   }
 
   async executeRaw(query: SqlQuery): Promise<number> {
-    const translated = translatePrismaSql({ sql: query.sql, args: query.args });
+    const translated = translateDriverSql(query);
     if (translated.operation.kind === "query") {
       throw prismaCompatibilityError(
         prismaDiagnosticCodes.unsupportedSql,
