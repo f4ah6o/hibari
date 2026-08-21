@@ -18,3 +18,10 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm test
+
+  wordpress-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: php -v
+      - run: bash packages/wordpress/test/stock-wordpress.sh
