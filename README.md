@@ -76,15 +76,15 @@ The WordPress consumer is proven against the stock WordPress 7.1 release without
 
 - `wp-content/db.php` installs `Hibari\WordPress\HibariWpdb`
 - the custom `wpdb` does not open a MySQL connection
-- inherited WordPress APIs such as `prepare()` and `get_row()` continue through the custom query boundary
+- inherited WordPress APIs such as `prepare()` / `get_row()` / `update()` / `delete()` continue through the custom query boundary without MySQL metadata access
 - WordPress owns WordPress SQL/table/column -> Hibari IR translation
 - JOIN / aggregate / transaction / DDL / subquery SQL is rejected early with stable `HIB-WP-*` diagnostics
 - the PHP bridge contains no kintone App ID, field code, revision, REST endpoint, or pagination logic
 
-The full integration proof is:
+The runtime integration path is:
 
 ```text
-stock WordPress 7.1 get_option()
+stock WordPress 7.1
   -> db.php / HibariWpdb
   -> WordPress SQL translator
   -> PHP HTTP bridge
@@ -94,7 +94,18 @@ stock WordPress 7.1 get_option()
   -> fake kintone REST
 ```
 
-The next WordPress work expands from this read proof to WordPress-owned state changes, beginning with options read/write, then content, users, taxonomy, comments, and postmeta.
+Stock WordPress Options CRUD is also proven through that path:
+
+```text
+get_option()
+update_option()
+add_option()
+delete_option()
+```
+
+`wp_options.option_name` is modeled as the backend-neutral unique `Option.name` field. Core's MySQL-specific `INSERT ... ON DUPLICATE KEY UPDATE` statement is normalized inside the WordPress consumer to Hibari `upsert`; generic MySQL compatibility is not added to the core or backend.
+
+The next WordPress proof moves to posts/pages content CRUD, followed by users, taxonomy, comments, and postmeta/EAV.
 
 ## Development
 
@@ -103,4 +114,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads the pinned stock WordPress 7.1 release and runs both the database-drop-in proof and the full WordPress-to-KintoneBackend runtime proof. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, and Options CRUD proofs. Live kintone credentials are not required.
