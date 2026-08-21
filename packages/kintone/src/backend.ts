@@ -1,14 +1,21 @@
 import type {
+  DatastoreRuntime,
   Diagnostic,
   ExecutionPlan,
   FilterExpression,
   ModelSchema,
   MutationIR,
-  QueryIR
+  QueryIR,
+  RecordValue
 } from "@hibari/core";
 import { planMutation } from "@hibari/core";
 import { kintoneCapabilities } from "./capabilities.js";
-import { decodeKintoneRecord, encodeKintoneRecord, kintoneFieldCode } from "./codec.js";
+import {
+  decodeKintoneRecord,
+  encodeKintoneRecord,
+  kintoneFieldCode,
+  kintoneFieldName
+} from "./codec.js";
 import { prepareKintoneQuery } from "./query.js";
 import { schemaFromFormFields } from "./schema.js";
 import type {
@@ -90,7 +97,29 @@ function exactEquality(
   return undefined;
 }
 
-export class KintoneBackend {
+function systemNumber(value: string | undefined): string | number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? value : parsed;
+}
+
+function withSystemFields(
+  record: RecordValue,
+  idField: string,
+  revisionField: string,
+  id: string | undefined,
+  revision: string | undefined
+): RecordValue {
+  return {
+    ...record,
+    ...(id === undefined ? {} : { [idField]: systemNumber(id) }),
+    ...(revision === undefined ? {} : { [revisionField]: systemNumber(revision) })
+  };
+}
+
+export class KintoneBackend implements DatastoreRuntime {
   readonly #transport: KintoneTransport;
   readonly #bindings: ReadonlyMap<string, KintoneModelBinding>;
   readonly #schemas = new Map<string, ModelSchema>();
@@ -232,12 +261,16 @@ export class KintoneBackend {
     model: string,
     where: Extract<MutationIR, { readonly operation: "update" }>["where"],
     limit?: number
-  ): Promise<readonly Readonly<Record<string, unknown>>[]> {
+  ): Promise<readonly RecordValue[]> {
+    const binding = this.#binding(model);
     return (
       await this.query({
         kind: "query",
         model,
-        projection: ["$id", "$revision"],
+        projection: [
+          kintoneFieldName(binding, "$id"),
+          kintoneFieldName(binding, "$revision")
+        ],
         filter: where,
         ...(limit === undefined ? {} : { limit })
       })
@@ -248,20 +281,22 @@ export class KintoneBackend {
     const binding = this.#binding(mutation.model);
     const plan = assertMutationPlan(mutation);
     const schema = this.#schemas.get(mutation.model);
+    const idField = kintoneFieldName(binding, "$id");
+    const revisionField = kintoneFieldName(binding, "$revision");
 
     if (
       (mutation.operation === "update" ||
         mutation.operation === "delete" ||
         mutation.operation === "upsert") &&
       mutation.concurrency !== undefined &&
-      mutation.concurrency.field !== "$revision"
+      kintoneFieldCode(binding, mutation.concurrency.field) !== "$revision"
     ) {
       throw new KintoneCompatibilityError(
-        "Kintone optimistic concurrency uses the $revision token.",
+        "Kintone optimistic concurrency uses the revision token mapped by the model binding.",
         [
           backendDiagnostic(
             "HIB-KINTONE-REVISION-001",
-            `Concurrency field '${mutation.concurrency.field}' is not the Kintone revision token.`,
+            `Concurrency field '${mutation.concurrency.field}' is not mapped to the Kintone revision token.`,
             "mutation.optimisticConcurrency"
           )
         ]
@@ -279,6 +314,15 @@ export class KintoneBackend {
       });
       return {
         affected: 1,
+        records: [
+          withSystemFields(
+            mutation.record,
+            idField,
+            revisionField,
+            response.id,
+            response.revision
+          )
+        ],
         ...(response.id === undefined ? {} : { ids: [response.id] }),
         ...(response.revision === undefined ? {} : { revisions: [response.revision] }),
         plan
@@ -300,7 +344,15 @@ export class KintoneBackend {
         ids.push(...(response.ids ?? []));
         revisions.push(...(response.revisions ?? []));
       }
-      return { affected: mutation.records.length, ids, revisions, plan };
+      return {
+        affected: mutation.records.length,
+        records: mutation.records.map((record, index) =>
+          withSystemFields(record, idField, revisionField, ids[index], revisions[index])
+        ),
+        ids,
+        revisions,
+        plan
+      };
     }
 
     if (mutation.operation === "upsert") {
@@ -328,7 +380,7 @@ export class KintoneBackend {
         await this.query({
           kind: "query",
           model: mutation.model,
-          projection: ["$id", "$revision"],
+          projection: [idField, revisionField],
           filter: mutation.where,
           limit: 2
         })
@@ -358,6 +410,15 @@ export class KintoneBackend {
         });
         return {
           affected: 1,
+          records: [
+            withSystemFields(
+              mutation.create,
+              idField,
+              revisionField,
+              response.id,
+              response.revision
+            )
+          ],
           ...(response.id === undefined ? {} : { ids: [response.id] }),
           ...(response.revision === undefined ? {} : { revisions: [response.revision] }),
           plan
@@ -370,16 +431,24 @@ export class KintoneBackend {
         path: path(binding, "record.json"),
         body: {
           app: binding.app,
-          id: current.$id,
+          id: current[idField],
           record: encodeKintoneRecord(mutation.update, binding, schema),
           ...(mutation.concurrency === undefined
             ? {}
             : { revision: mutation.concurrency.expected })
         }
       });
+      const updatedRecord: RecordValue = {
+        ...current,
+        ...mutation.update,
+        ...(response.revision === undefined
+          ? {}
+          : { [revisionField]: systemNumber(response.revision) })
+      };
       return {
         affected: 1,
-        ids: [String(current.$id)],
+        records: [updatedRecord],
+        ids: [String(current[idField])],
         ...(response.revision === undefined ? {} : { revisions: [response.revision] }),
         plan
       };
@@ -404,15 +473,13 @@ export class KintoneBackend {
     }
 
     if (matches.length === 0) {
-      return { affected: 0, plan };
+      return { affected: 0, records: [], plan };
     }
 
     if (mutation.operation === "delete") {
-      const ids = matches.map((record) => String(record.$id));
+      const ids = matches.map((record) => String(record[idField]));
       const revisions = matches.map((record) =>
-        mutation.concurrency === undefined
-          ? -1
-          : mutation.concurrency.expected
+        mutation.concurrency === undefined ? -1 : mutation.concurrency.expected
       );
       for (const [index, batch] of chunks(ids, 100).entries()) {
         const start = index * 100;
@@ -426,18 +493,19 @@ export class KintoneBackend {
           }
         });
       }
-      return { affected: ids.length, ids, plan };
+      return { affected: ids.length, records: matches, ids, plan };
     }
 
     const changes = encodeKintoneRecord(mutation.changes, binding, schema);
+    const returnedRevisions = new Map<string, string>();
     for (const batch of chunks(matches, 100)) {
-      await this.#transport.request<WriteResponse>({
+      const response = await this.#transport.request<WriteResponse>({
         method: "PUT",
         path: path(binding, "records.json"),
         body: {
           app: binding.app,
           records: batch.map((record) => ({
-            id: record.$id,
+            id: record[idField],
             record: changes,
             ...((mutation.operation === "update" && mutation.concurrency !== undefined)
               ? { revision: mutation.concurrency.expected }
@@ -445,10 +513,26 @@ export class KintoneBackend {
           }))
         }
       });
+      for (const returned of response.records ?? []) {
+        returnedRevisions.set(String(returned.id), returned.revision);
+      }
     }
+    const records = matches.map((record) => {
+      const revision = returnedRevisions.get(String(record[idField]));
+      return {
+        ...record,
+        ...mutation.changes,
+        ...(revision === undefined ? {} : { [revisionField]: systemNumber(revision) })
+      };
+    });
     return {
       affected: matches.length,
-      ids: matches.map((record) => String(record.$id)),
+      records,
+      ids: matches.map((record) => String(record[idField])),
+      revisions: records
+        .map((record) => record[revisionField])
+        .filter((value): value is string | number => typeof value === "string" || typeof value === "number")
+        .map(String),
       plan
     };
   }
