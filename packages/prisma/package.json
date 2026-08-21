@@ -19,7 +19,7 @@
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "generate:test-client": "prisma generate --schema test/fixtures/prisma/schema.prisma",
-    "test": "npm run build && node --test test/sql.test.mjs && npm run generate:test-client && node --test test/prisma-client.test.mjs",
+    "test": "npm run build && node --test test/sql.test.mjs && npm run generate:test-client && node --import tsx --test test/prisma-client.test.ts",
     "prepack": "npm run build"
   },
   "dependencies": {
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@prisma/client": "7.9.1",
     "prisma": "7.9.1",
+    "tsx": "4.23.12",
     "typescript": "^5.8.3"
   },
   "engines": {
