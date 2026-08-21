@@ -121,10 +121,11 @@ export function createRuntimeHttpServer(options: RuntimeHttpServerOptions): Serv
 
       json(response, 404, { error: { message: "Unknown Hibari runtime endpoint." } });
     } catch (error) {
+      const errorDiagnostics = diagnostics(error);
       const body: RuntimeHttpErrorBody = {
         error: {
           message: message(error),
-          ...(diagnostics(error) === undefined ? {} : { diagnostics: diagnostics(error) })
+          ...(errorDiagnostics === undefined ? {} : { diagnostics: errorDiagnostics })
         }
       };
       json(response, statusCode(error), body);
