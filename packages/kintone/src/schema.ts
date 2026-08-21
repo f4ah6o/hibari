@@ -148,10 +148,12 @@ export function schemaFromFormFields(
   binding: KintoneModelBinding
 ): KintoneSchemaResult {
   const properties = Object.values(response.properties);
+  const idName = applicationName(binding, "$id");
+  const revisionName = applicationName(binding, "$revision");
   const fields = [
     {
       kind: "scalar" as const,
-      name: "$id",
+      name: idName,
       type: "integer" as const,
       nullable: false,
       mutable: false,
@@ -159,7 +161,7 @@ export function schemaFromFormFields(
     },
     {
       kind: "scalar" as const,
-      name: "$revision",
+      name: revisionName,
       type: "integer" as const,
       nullable: false,
       mutable: false,
@@ -187,9 +189,9 @@ export function schemaFromFormFields(
   const schema: ModelSchema = {
     name: binding.model,
     fields,
-    identifier: ["$id"],
+    identifier: [idName],
     uniqueConstraints,
-    concurrencyToken: { field: "$revision", kind: "revision" },
+    concurrencyToken: { field: revisionName, kind: "revision" },
     relationHints,
     extensions: {
       kintone: {
