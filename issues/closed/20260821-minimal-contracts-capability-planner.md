@@ -51,16 +51,16 @@ Hibari の最初の実装単位として、consumer / backend の concrete API �
 
 ## Acceptance criteria
 
-- [ ] Schema IR が identifier / uniqueness / concurrency token / embedded collection / relation hint / extension metadata を表現できる
-- [ ] Query / Mutation IR が親 issue の最小 portable operation を表現できる
-- [ ] fake backend manifest だけで operation compatibility を計画できる
-- [ ] native query が warning なしで plan できる
-- [ ] emulated capability を info として plan に残せる
-- [ ] expensive operation を warning として plan に残せる
-- [ ] unsupported operation を stable diagnostic code 付きで backend execution 前に reject できる
-- [ ] query と mutation が同一の classification / diagnostics model を利用する
-- [ ] pagination / batching の estimated request count を inspect できる
-- [ ] contract tests が green
+- [x] Schema IR が identifier / uniqueness / concurrency token / embedded collection / relation hint / extension metadata を表現できる
+- [x] Query / Mutation IR が親 issue の最小 portable operation を表現できる
+- [x] fake backend manifest だけで operation compatibility を計画できる
+- [x] native query が warning なしで plan できる
+- [x] emulated capability を info として plan に残せる
+- [x] expensive operation を warning として plan に残せる
+- [x] unsupported operation を stable diagnostic code 付きで backend execution 前に reject できる
+- [x] query と mutation が同一の classification / diagnostics model を利用する
+- [x] pagination / batching の estimated request count を inspect できる
+- [x] contract tests が green
 
 ## Completion evidence
 
