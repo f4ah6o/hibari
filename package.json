@@ -5,12 +5,13 @@
   "description": "Capability-aware datastore compatibility layer.",
   "workspaces": [
     "packages/core",
-    "packages/kintone"
+    "packages/kintone",
+    "packages/prisma"
   ],
   "scripts": {
-    "build": "npm run build --workspace @hibari/core && npm run build --workspace @hibari/kintone",
-    "check": "npm run check --workspace @hibari/core && npm run check --workspace @hibari/kintone",
-    "test": "npm run test --workspace @hibari/core && npm run test --workspace @hibari/kintone"
+    "build": "npm run build --workspace @hibari/core && npm run build --workspace @hibari/kintone && npm run build --workspace @hibari/prisma",
+    "check": "npm run check --workspace @hibari/core && npm run check --workspace @hibari/kintone && npm run check --workspace @hibari/prisma",
+    "test": "npm run test --workspace @hibari/core && npm run test --workspace @hibari/kintone && npm run test --workspace @hibari/prisma"
   },
   "engines": {
     "node": ">=20"
