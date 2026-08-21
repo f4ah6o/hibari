@@ -13,7 +13,7 @@ function unescapeKintoneString(value) {
 }
 
 class FakeKintoneTransport {
-  #nextId = 2;
+  #nextId = 3;
   #records = new Map([
     [
       "1",
@@ -23,6 +23,16 @@ class FakeKintoneTransport {
         Option_name: "siteurl",
         Option_value: "https://kintone-backed.example.test/",
         Autoload: "on"
+      }
+    ],
+    [
+      "2",
+      {
+        id: "2",
+        revision: 1,
+        Option_name: "hibari_existing",
+        Option_value: "before",
+        Autoload: "off"
       }
     ]
   ]);
