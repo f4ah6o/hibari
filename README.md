@@ -154,7 +154,24 @@ wp_insert_term("Hibari Category", "category") // WP_Error('term_exists')
 
 `Term` and `TermTaxonomy` remain ordinary backend-neutral models. The two JOIN-shaped confidence/context checks emitted specifically by `wp_insert_term()` are decomposed inside the WordPress consumer into bounded Hibari queries; they do not enable generic JOIN execution. Hierarchical cache regeneration's exact `id=>parent` query is likewise projected from taxonomy-scoped `TermTaxonomy` records. The kintone proof verifies one Term write and one TermTaxonomy write, then rejects the duplicate without a second logical pair. Race-free atomic uniqueness across two backend apps is not claimed.
 
-Remaining WordPress domains include users, comments, media metadata, broader `WP_Query` / `WP_Term_Query` compatibility, termmeta, term-count maintenance, and deletion/trash semantics.
+Stock User entity create/read/update and duplicate checks are also proven:
+
+```text
+wp_insert_user(...)
+get_user_by("id", ...)
+get_user_by("login", ...)
+get_user_by("email", ...)
+get_user_meta(...)
+wp_update_user(...)
+```
+
+`wp_users` is projected to an ordinary backend-neutral `User` model. Login, email, ID, and nicename checks are narrow scalar QueryIR operations; insert/update use ordinary MutationIR. Duplicate login and duplicate email are rejected by stock WordPress as `existing_user_login` and `existing_user_email`, and the proof verifies only one User create reaches the backend.
+
+`wp_usermeta` reuses the same Dynamic Attributes contract as postmeta. The WordPress adapter now factors the common EAV SQL shapes into a configurable metadata translator, with PostMeta and UserMeta supplying only their table/owner/id/model configuration. Stock default user metadata such as `nickname`, names, editor preferences, capabilities, and user level is persisted through that common path.
+
+WordPress hashes the supplied password before the User write. Hibari treats that stored value as opaque data and does not hash or verify passwords. The proof verifies the persisted value differs from the plaintext and survives a basic update unchanged, while the fake Kintone request evidence replaces the credential field with `[REDACTED]` before logging and fails if fixture plaintext or recognizable password-hash material appears. Authentication, sessions, password verification/reset, authorization behavior, and approval to store production credential hashes in live kintone remain separate security domains. User-count `COUNT(*)` maintenance also remains outside this proof so aggregate SQL stays unsupported.
+
+Remaining WordPress domains include comments, media metadata, broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` compatibility, termmeta, term-count/user-count maintenance, authentication/security acceptance, and deletion/trash semantics.
 
 ## Development
 
@@ -163,4 +180,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, and term creation/uniqueness proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, term creation/uniqueness, and User/UserMeta proofs. Live kintone credentials are not required.
