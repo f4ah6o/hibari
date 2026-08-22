@@ -127,6 +127,14 @@ hibari_post_assert('Hibari initial body' === $created->post_content, 'created pa
 hibari_post_assert('draft' === $created->post_status, 'created page status changed unexpectedly');
 hibari_post_assert('page' === $created->post_type, 'created record was not a page');
 
+// wp_update_post() expands WP_Post to ARRAY_A before merging changes. Core's
+// WP_Post::to_array() always asks for the virtual page_template property, which
+// falls through to postmeta on a cache miss. This child intentionally excludes
+// wp_postmeta, and this post was just created without metadata, so prime the
+// authoritative empty metadata set instead of teaching the production SQL
+// translator a fake postmeta implementation.
+wp_cache_set($post_id, array(), 'post_meta');
+
 $updated_id = wp_update_post(
     array(
         'ID' => $post_id,
