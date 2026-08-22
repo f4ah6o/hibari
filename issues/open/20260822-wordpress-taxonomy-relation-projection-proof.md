@@ -15,31 +15,38 @@ Open
 
 ## Goal
 
-Stock WordPress 7.1 の category/tag relationship を、Hibari core を SQL JOIN engine にせず、generic relation-edge capability として表現できることを実証する。
+Stock WordPress 7.1 の category relationship を、Hibari core を SQL JOIN engine にせず、generic relation-edge capability として表現できることを実証する。
 
-この child の主目的は taxonomy feature 数を増やすことではない。`wp_terms` / `wp_term_taxonomy` / `wp_term_relationships` が要求する entity + context + many-to-many edge を consumer-neutral contract へ分解し、WordPress adapter が SQL-oriented legacy shape を吸収しても core が relational SQL abstraction に変質しないことを確認する。
+この child の主目的は taxonomy feature 数を増やすことではない。`wp_term_relationships` が要求する many-to-many edge semantics を consumer-neutral contract へ分解し、WordPress adapter が legacy SQL/high-level query shape を吸収しても core が relational SQL abstraction に変質しないことを確認する。
+
+## Scope correction after source inspection
+
+`wp_insert_term()` は relation edgeだけの操作ではない。Stock WordPress 7.1 Coreは term creation 中に name/slug uniqueness、`wp_terms` + `wp_term_taxonomy` JOIN、duplicate confidence check まで行う。
+
+それらをこのchildへ混ぜると Relation Edge proof が Term entity/uniqueness/SQL JOIN compatibility proofへ拡散するため、**term creation は独立childへ分離する**。
+
+このchildでは pre-existing category Term / TermTaxonomy を backend fixture に与える。WordPress adapterはその既存termを高位の `terms_pre_query` projectionで取得できるようにする。これはtaxonomy SQL JOINを一般化せず、WordPressが提供する query short-circuit boundaryを利用する。
 
 ## First proof scope
 
 Stock public API を使う。
 
-- `wp_insert_term()` で1 categoryを作る
-- `wp_set_object_terms()` で既存 draft post/page と category を関連付ける
-- `wp_get_object_terms()` または `get_the_terms()` で関係を読む
-- relationship の重複追加はduplicate edgeを作らない
-- `wp_remove_object_terms()` でedgeを削除し、later readがabsenceを観測する
+- backend fixtureに既存 category Term / TermTaxonomy を1件用意する
+- stock `wp_set_object_terms()` で既存 draft page と category を関連付ける
+- stock `wp_get_object_terms(..., fields=tt_ids)` でrelationを読む
+- same object/termの再attachはduplicate edgeを作らない
+- stock `wp_remove_object_terms()` でedgeを削除し、later public readがabsenceを観測する
 
-最初のproofは hierarchical category 1種類、parent=0、term metadataなし、term orderなしに限定する。
+最初のproofは hierarchical category 1種類、parent=0、term metadataなし、term orderなしに限定する。Term entity作成/uniquenessはこのproofでは実装しない。
 
 ## Generic relation contract
 
 WordPress table namesをcoreへ入れない。
 
-概念的には次を表現する。
-
 ```text
 RelationEdgeBinding
   model
+  idField
   leftField
   rightField
   optional contextField
@@ -69,11 +76,11 @@ existing Capability Planner / ExecutionPlan
 
 ## WordPress projection
 
-概念 mapping:
+Conceptual mapping:
 
 ```text
-wp_terms                    -> Term entity
-wp_term_taxonomy            -> TermTaxonomy entity/context
+wp_terms                    -> Term entity (pre-existing fixture in this child)
+wp_term_taxonomy            -> TermTaxonomy entity/context (pre-existing fixture)
 wp_term_relationships       -> RelationEdge
 
 object_id                   -> edge.leftId
@@ -83,45 +90,80 @@ term_order                  -> edge.order (optional)
 
 kintone proofでは各entity/edgeを別Appへbindingしてよいが、App ID/field codeはbackend configuration以外へ漏らさない。
 
+### High-level term query boundary
+
+`WP_Term_Query` always generates `terms INNER JOIN term_taxonomy` and adds a third relationship JOIN when `object_ids` is present. Even `fields=tt_ids` first constructs `WP_Term` objects and only then formats `term_taxonomy_id`.
+
+Therefore the WordPress consumer adapter must not teach Hibari core JOIN semantics. Instead it may register `terms_pre_query` and, for the exact supported taxonomy query shapes, execute bounded Hibari IR operations:
+
+- term existence by known term/taxonomy -> bounded Term/TermTaxonomy lookup
+- object relation read -> left-scoped RelationEdge lookup plus bounded term/context projection as needed
+
+Arbitrary `WP_Term_Query` stays unsupported.
+
+### SQL boundary that remains
+
+Stock `wp_set_object_terms()` / `wp_remove_object_terms()` directly issue simple `wp_term_relationships` SQL for:
+
+- pair existence lookup
+- relationship insert
+- relationship delete
+
+Only these narrow edge-row SQL shapes are translated to RelationEdge QueryIR / MutationIR. Generic JOIN SQL remains rejected by preflight.
+
 ## Important WordPress semantics
 
-Stock `wp_set_object_terms()` は少なくとも次を行う。
+Stock `wp_set_object_terms()`:
 
-- current relation setを読む
-- term existence / taxonomy contextを確認する
-- missing edgeのみinsertする
-- append=falseではold/new差分を削除する
-- relationship duplicateを作らない
+- reads current relation set when append=false
+- resolves the existing term/taxonomy context
+- inserts only a missing edge
+- append=false removes old/new differences
+- does not create duplicate relationship rows
 
-この意味を「SQL JOINがないから全scan」で黙って再現しない。bounded owner-scoped edge lookupをportable capabilityとして扱う。
+This meaning must not be reproduced by an unbounded client-side scan. Owner-scoped edge lookup is the portable capability.
+
+Term count maintenance is explicitly deferred in this proof because count optimization/aggregate semantics are a separate concern; the relation edge itself remains authoritative for membership.
 
 ## Capability requirements
 
-Generic relation-edge capabilitiesとして最低限:
+Generic relation-edge capabilities:
 
 - left-scoped lookup
-- left+right existence lookup
+- left+right pair lookup
 - multi-edge
-- unique edge / duplicate prevention
+- unique attach / duplicate prevention
 - attach
 - detach
 - replace/diff emulation
-- cross-owner scan cost
+- cross-owner scan
 
-kintoneでatomic unique edgeを保証できない場合は `uniqueAttach=emulated` として存在確認+insertを明示する。競合を完全に防げないならその制約をdiagnostic/planに残す。
+kintone profile for this proof:
+
+- left-scoped lookup: native
+- pair lookup: native
+- multi-edge: native
+- attach: native
+- uniqueAttach: emulated
+- detach: emulated
+- replace: emulated
+- cross-owner scan: unsupported
+
+Atomic unique edge is not claimed. `uniqueAttach=emulated` exposes existence-check + insert explicitly.
 
 ## Acceptance criteria
 
 - [ ] generic relation-edge contract が core に追加されても WordPress / SQL / kintone concrete API に依存しない
 - [ ] relation operation が既存 QueryIR / MutationIR と planner/diagnosticsへ lower される
-- [ ] WordPress adapter が必要最小限の stock taxonomy SQL shape のみを所有する
-- [ ] stock WordPress 7.1 `wp_insert_term()` が unchanged で term/contextを永続化する
+- [ ] exact WordPress taxonomy high-level query projection is owned by the WordPress consumer
+- [ ] only narrow direct `wp_term_relationships` SQL shapes are translated; generic JOIN remains unsupported
+- [ ] pre-existing Term / TermTaxonomy fixture is resolved without implementing term creation in this child
 - [ ] stock `wp_set_object_terms()` が unchanged でedgeを作る
-- [ ] later public read がedge/termをbackend stateから観測する
+- [ ] stock public relation read がbackend stateからmembershipを観測する
 - [ ] same object/termの再attachでduplicate edgeを作らない
 - [ ] stock `wp_remove_object_terms()` がedgeを削除する
+- [ ] later public relation read observes absence
 - [ ] relation-scoped lookupがbackend full scanへsilent fallbackしない
-- [ ] arbitrary JOIN SQLは引き続きunsupportedである
 - [ ] WordPress/coreにkintone App ID / field codeを入れない
 - [ ] previous core/kintone/Prisma/WordPress proofs remain green
 
@@ -132,26 +174,29 @@ kintoneでatomic unique edgeを保証できない場合は `uniqueAttach=emulate
 - taxonomy専用relation typeをcoreへ入れない
 - relation setを単一JSON blobへ隠さない
 - unsupported JOINをclient-side unbounded scanで再現しない
+- `wp_insert_term()` compatibilityをこのchildへ戻さない
 - comments/users/media/revisionsをこのchildへ混ぜない
-- termmetaは既存Dynamic Attributesを別child/extensionで再利用可能とするが、このproofの必須範囲にしない
+- termmetaは既存Dynamic Attributesを将来再利用する
 
 ## Completion evidence required
 
 - relation-edge planner/lowering contract tests
-- stock WordPress 7.1 public taxonomy API proof
-- fake Kintone request log for term/context/edge create/read/delete
+- stock WordPress 7.1 public relation API proof
+- fake Kintone request log for edge create/read/delete
 - duplicate-edge behavior evidence
+- proof that generic JOIN diagnostic remains active
 - full CI with all previous proofs green
 - exact run/revisionをissueへ記録してからclosedへ移動する
 
 ## Non-goals
 
+- `wp_insert_term()` / term entity creation / name+slug uniqueness
 - arbitrary `WP_Term_Query`
 - arbitrary taxonomy JOIN SQL
 - tag + categoryを同時に網羅すること
 - nested hierarchical term traversal
 - termmeta
-- term count optimization beyond semantics required by the proof
+- term count optimization/aggregate maintenance
 - custom taxonomy/plugin compatibility
 - post delete cascade
 - live kintone credentials
