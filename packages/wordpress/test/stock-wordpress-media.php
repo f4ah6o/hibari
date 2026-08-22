@@ -29,6 +29,7 @@ define('DB_CHARSET', 'utf8mb4');
 define('DB_COLLATE', '');
 define('SHORTINIT', true);
 define('WP_DEBUG', false);
+define('WP_CONTENT_URL', 'https://kintone-backed.example.test/wp-content');
 PHP;
 
 $config .= "\ndefine('HIBARI_WORDPRESS_ROOT', " . var_export($package_root, true) . ");\n";
