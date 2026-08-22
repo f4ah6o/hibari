@@ -49,6 +49,22 @@ interface Bridge {
     public function execute($sql, $plan);
 }
 
+/**
+ * Optional high-level bridge used when WordPress itself exposes a semantic
+ * short-circuit before SQL execution (for example WP_Term_Query's
+ * `terms_pre_query`). Operations are still ordinary Hibari Query/Mutation IR;
+ * this interface does not expose a concrete backend or backend transport.
+ */
+interface OperationBridge extends Bridge {
+    /**
+     * @param string               $endpoint query|mutation
+     * @param array<string, mixed> $operation Hibari IR payload
+     * @param string               $context diagnostic context only
+     * @return array<string, mixed>
+     */
+    public function executeOperation($endpoint, $operation, $context = '');
+}
+
 final class CompatibilityException extends \RuntimeException {
     /** @var string */
     public $diagnostic_code;
