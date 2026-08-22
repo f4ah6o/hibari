@@ -12,17 +12,42 @@ function unescapeKintoneString(value) {
   return value.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
 }
 
+function wrappedRecord(record, requestedFields) {
+  const source = {
+    $id: record.id,
+    $revision: String(record.revision),
+    ...record.fields
+  };
+  const fields = requestedFields ?? Object.keys(source);
+  return Object.fromEntries(
+    fields
+      .filter((field) => field in source)
+      .map((field) => [field, { value: source[field] }])
+  );
+}
+
+function applyWrapped(record, wrapped) {
+  for (const [field, item] of Object.entries(wrapped ?? {})) {
+    if (field === "$id" || field === "$revision") continue;
+    record.fields[field] = item?.value;
+  }
+  record.revision += 1;
+}
+
 class FakeKintoneTransport {
-  #nextId = 3;
-  #records = new Map([
+  #nextOptionId = 3;
+  #nextPostId = 1;
+  #optionRecords = new Map([
     [
       "1",
       {
         id: "1",
         revision: 1,
-        Option_name: "siteurl",
-        Option_value: "https://kintone-backed.example.test/",
-        Autoload: "on"
+        fields: {
+          Option_name: "siteurl",
+          Option_value: "https://kintone-backed.example.test/",
+          Autoload: "on"
+        }
       }
     ],
     [
@@ -30,93 +55,96 @@ class FakeKintoneTransport {
       {
         id: "2",
         revision: 1,
-        Option_name: "hibari_existing",
-        Option_value: "before",
-        Autoload: "off"
+        fields: {
+          Option_name: "hibari_existing",
+          Option_value: "before",
+          Autoload: "off"
+        }
       }
     ]
   ]);
+  #postRecords = new Map();
 
   #nameFromQuery(query) {
     const match = /Option_name\s*=\s*"((?:\\.|[^"])*)"/.exec(query);
     return match ? unescapeKintoneString(match[1]) : undefined;
   }
 
-  #findByName(name) {
-    return [...this.#records.values()].find((record) => record.Option_name === name);
+  #idFromQuery(query) {
+    const match = /\$id\s*=\s*(?:"(\d+)"|(\d+))/.exec(query);
+    return match ? String(match[1] ?? match[2]) : undefined;
   }
 
-  #wrapped(record, requestedFields) {
-    const source = {
-      $id: record.id,
-      $revision: String(record.revision),
-      Option_name: record.Option_name,
-      Option_value: record.Option_value,
-      Autoload: record.Autoload
-    };
-    const fields = requestedFields ?? Object.keys(source);
-    return Object.fromEntries(
-      fields
-        .filter((field) => field in source)
-        .map((field) => [field, { value: source[field] }])
+  #findOptionByName(name) {
+    return [...this.#optionRecords.values()].find(
+      (record) => record.fields.Option_name === name
     );
   }
 
-  #applyWrapped(record, wrapped) {
-    for (const [field, item] of Object.entries(wrapped ?? {})) {
-      if (field === "$id" || field === "$revision") continue;
-      record[field] = item?.value;
-    }
-    record.revision += 1;
+  #store(app) {
+    if (Number(app) === 84) return this.#optionRecords;
+    if (Number(app) === 85) return this.#postRecords;
+    throw new Error(`Unexpected fake Kintone app ${app}`);
+  }
+
+  #newId(app) {
+    if (Number(app) === 84) return String(this.#nextOptionId++);
+    if (Number(app) === 85) return String(this.#nextPostId++);
+    throw new Error(`Unexpected fake Kintone app ${app}`);
   }
 
   async request(request) {
     appendFileSync(requestLog, `${JSON.stringify(request)}\n`);
+    const app = request.body?.app;
 
     if (request.method === "GET" && request.path.endsWith("/records.json")) {
       const query = request.body?.query ?? "";
-      const name = this.#nameFromQuery(query);
-      const record = name === undefined ? undefined : this.#findByName(name);
+      let record;
+      if (Number(app) === 84) {
+        const name = this.#nameFromQuery(query);
+        record = name === undefined ? undefined : this.#findOptionByName(name);
+      } else if (Number(app) === 85) {
+        const id = this.#idFromQuery(query);
+        record = id === undefined ? undefined : this.#postRecords.get(id);
+      } else {
+        throw new Error(`Unexpected fake Kintone app ${app}`);
+      }
       return {
-        records: record ? [this.#wrapped(record, request.body?.fields)] : []
+        records: record ? [wrappedRecord(record, request.body?.fields)] : []
       };
     }
 
     if (request.method === "POST" && request.path.endsWith("/record.json")) {
-      const id = String(this.#nextId++);
-      const record = {
-        id,
-        revision: 1,
-        Option_name: "",
-        Option_value: "",
-        Autoload: "off"
-      };
+      const id = this.#newId(app);
+      const record = { id, revision: 1, fields: {} };
       for (const [field, item] of Object.entries(request.body?.record ?? {})) {
-        record[field] = item?.value;
+        record.fields[field] = item?.value;
       }
-      this.#records.set(id, record);
+      this.#store(app).set(id, record);
       return { id, revision: "1" };
     }
 
     if (request.method === "PUT" && request.path.endsWith("/record.json")) {
-      const record = this.#records.get(String(request.body?.id));
+      const record = this.#store(app).get(String(request.body?.id));
       if (!record) throw new Error(`Unknown fake Kintone record ${request.body?.id}`);
-      this.#applyWrapped(record, request.body?.record);
+      applyWrapped(record, request.body?.record);
       return { revision: String(record.revision) };
     }
 
     if (request.method === "PUT" && request.path.endsWith("/records.json")) {
+      const returned = [];
       for (const change of request.body?.records ?? []) {
-        const record = this.#records.get(String(change.id));
+        const record = this.#store(app).get(String(change.id));
         if (!record) throw new Error(`Unknown fake Kintone record ${change.id}`);
-        this.#applyWrapped(record, change.record);
+        applyWrapped(record, change.record);
+        returned.push({ id: record.id, revision: String(record.revision) });
       }
-      return {};
+      return { records: returned };
     }
 
     if (request.method === "DELETE" && request.path.endsWith("/records.json")) {
       for (const id of request.body?.ids ?? []) {
-        this.#records.delete(String(id));
+        this.#store(app).delete(String(id));
       }
       return {};
     }
@@ -124,6 +152,32 @@ class FakeKintoneTransport {
     throw new Error(`Unexpected fake Kintone request: ${request.method} ${request.path}`);
   }
 }
+
+const postFieldCodes = {
+  id: "$id",
+  authorId: "Post_author",
+  date: "Post_date",
+  dateGmt: "Post_date_gmt",
+  content: "Post_content",
+  title: "Post_title",
+  excerpt: "Post_excerpt",
+  status: "Post_status",
+  commentStatus: "Comment_status",
+  pingStatus: "Ping_status",
+  password: "Post_password",
+  slug: "Post_name",
+  toPing: "To_ping",
+  pinged: "Pinged",
+  modified: "Post_modified",
+  modifiedGmt: "Post_modified_gmt",
+  contentFiltered: "Post_content_filtered",
+  parentId: "Post_parent",
+  guid: "Guid",
+  menuOrder: "Menu_order",
+  type: "Post_type",
+  mimeType: "Post_mime_type",
+  commentCount: "Comment_count"
+};
 
 const backend = new KintoneBackend(new FakeKintoneTransport(), [
   {
@@ -135,6 +189,12 @@ const backend = new KintoneBackend(new FakeKintoneTransport(), [
       autoload: "Autoload"
     },
     uniqueFields: ["name"]
+  },
+  {
+    model: "Post",
+    app: 85,
+    fieldCodes: postFieldCodes,
+    uniqueFields: ["id"]
   }
 ]);
 
