@@ -26,6 +26,8 @@ Consumers and backends depend on backend-neutral contracts. Consumer packages do
 - `native` / `emulated` / `expensive` / `unsupported` planning
 - inspectable Execution Plan
 - stable structured diagnostics
+- generic Dynamic Attributes contract for EAV-like owner/key/multi-value data
+- Dynamic Attribute operations lower to the existing Query / Mutation IR and use the same planner and diagnostics
 
 ### `@hibari/kintone`
 
@@ -39,6 +41,7 @@ Consumers and backends depend on backend-neutral contracts. Consumer packages do
 - optimistic concurrency through kintone revision
 - injectable transport and fetch-based REST transport
 - kintone limits centralized in one Capability Manifest
+- Dynamic Attributes capability profile: owner/key lookup and multi-value are native, unique-add is explicit emulation, unbounded cross-owner scan is unsupported
 
 ### `@hibari/prisma`
 
@@ -94,7 +97,7 @@ stock WordPress 7.1
   -> fake kintone REST
 ```
 
-Stock WordPress Options CRUD is also proven through that path:
+Stock WordPress Options CRUD is proven through that path:
 
 ```text
 get_option()
@@ -105,7 +108,28 @@ delete_option()
 
 `wp_options.option_name` is modeled as the backend-neutral unique `Option.name` field. Core's MySQL-specific `INSERT ... ON DUPLICATE KEY UPDATE` statement is normalized inside the WordPress consumer to Hibari `upsert`; generic MySQL compatibility is not added to the core or backend.
 
-The next WordPress proof moves to posts/pages content CRUD, followed by users, taxonomy, comments, and postmeta/EAV.
+Stock page content create/read/update is also proven through unchanged public APIs:
+
+```text
+wp_insert_post()
+get_post()
+wp_update_post()
+```
+
+`wp_posts.ID` is exposed as ordinary `Post.id`; kintone `$id` remains a backend binding detail.
+
+The first postmeta/EAV proof is implemented as generic Dynamic Attributes rather than a `wp_postmeta` table emulator. The stock public Metadata API is proven end to end:
+
+```text
+add_post_meta()
+get_post_meta()
+update_post_meta()
+delete_post_meta()
+```
+
+The proof preserves multiple values for the same owner/key and WordPress `unique=true` behavior. WordPress-specific SQL remains in the WordPress adapter, Dynamic Attributes lower to ordinary Hibari IR, and the kintone proof stores metadata in a separately bound record app without exposing its App ID or field codes to WordPress or core.
+
+Remaining WordPress domains include users, taxonomy, comments, media metadata, WP_Query/search compatibility, and eventually deletion/trash semantics once dependent domains are explicit.
 
 ## Development
 
@@ -114,4 +138,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, and Options CRUD proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, and postmeta Dynamic Attributes proofs. Live kintone credentials are not required.
