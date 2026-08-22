@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   HibariPlanningError,
   assertExecutable,
+  lowerDynamicAttributeOperation,
+  planDynamicAttributeOperation,
   planMutation,
   planQuery
 } from "../dist/index.js";
@@ -48,6 +50,14 @@ function fakeManifest(overrides = {}) {
       interactive: "unsupported",
       ...overrides.transaction
     },
+    dynamicAttributes: {
+      ownerKeyLookup: "native",
+      ownerKeyValueLookup: "native",
+      multiValue: "native",
+      uniqueAdd: "native",
+      scan: "unsupported",
+      ...overrides.dynamicAttributes
+    },
     limits: {
       pageSize: 500,
       batchSize: 100,
@@ -58,6 +68,14 @@ function fakeManifest(overrides = {}) {
     }
   };
 }
+
+const metaBinding = {
+  model: "DynamicAttribute",
+  idField: "id",
+  ownerField: "ownerId",
+  keyField: "key",
+  valueField: "value"
+};
 
 test("native query stays backend-transparent while exposing its plan", () => {
   const plan = planQuery(
@@ -207,4 +225,70 @@ test("batching is transparent but request cost can still become expensive", () =
   assert.equal(plan.estimatedRequests, 21);
   assert.equal(plan.classification, "expensive");
   assert.ok(plan.diagnostics.some(({ code }) => code === "HIB-COST-002"));
+});
+
+test("dynamic attributes preserve multi-value row semantics without inventing a map", () => {
+  const first = lowerDynamicAttributeOperation({
+    kind: "dynamicAttribute",
+    operation: "add",
+    binding: metaBinding,
+    ownerId: 42,
+    key: "label",
+    value: "one"
+  });
+  const second = lowerDynamicAttributeOperation({
+    kind: "dynamicAttribute",
+    operation: "add",
+    binding: metaBinding,
+    ownerId: 42,
+    key: "label",
+    value: "two"
+  });
+
+  assert.equal(first.length, 1);
+  assert.equal(second.length, 1);
+  assert.equal(first[0].operation, "insert");
+  assert.equal(second[0].operation, "insert");
+  assert.deepEqual(first[0].record, { ownerId: 42, key: "label", value: "one" });
+  assert.deepEqual(second[0].record, { ownerId: 42, key: "label", value: "two" });
+});
+
+test("unique dynamic attribute add is planned as an explicit existence check plus insert", () => {
+  const plan = planDynamicAttributeOperation(
+    {
+      kind: "dynamicAttribute",
+      operation: "add",
+      binding: metaBinding,
+      ownerId: 42,
+      key: "external-id",
+      value: "abc",
+      unique: true
+    },
+    fakeManifest({ dynamicAttributes: { uniqueAdd: "emulated" } })
+  );
+
+  assert.equal(plan.classification, "emulated");
+  assert.ok(plan.assessments.some(({ capability }) => capability === "dynamicAttributes.uniqueAdd"));
+  assert.ok(plan.diagnostics.some(({ code }) => code === "HIB-CAP-002"));
+  assert.doesNotThrow(() => assertExecutable(plan));
+});
+
+test("dynamic attribute semantics fail early when the backend profile does not expose them", () => {
+  const manifest = fakeManifest();
+  delete manifest.dynamicAttributes;
+
+  const plan = planDynamicAttributeOperation(
+    {
+      kind: "dynamicAttribute",
+      operation: "lookup",
+      binding: metaBinding,
+      ownerId: 42,
+      key: "label"
+    },
+    manifest
+  );
+
+  assert.equal(plan.classification, "unsupported");
+  assert.ok(plan.diagnostics.some(({ capability }) => capability === "dynamicAttributes"));
+  assert.throws(() => assertExecutable(plan), HibariPlanningError);
 });
