@@ -184,7 +184,20 @@ wp_update_comment(..., comment_meta => ...)
 
 The Comment proof deliberately calls `wp_defer_comment_counting(true)` and does not flush it. This isolates comment-count recomputation, which uses aggregate SQL, without returning fake counts or enabling a generic aggregate engine. The narrow metadata `unique=true` existence check remains a bounded Dynamic Attributes lookup; arbitrary aggregate SQL remains unsupported.
 
-Remaining WordPress domains include media metadata, broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` / `WP_Comment_Query` compatibility, termmeta, term-count/user-count/comment-count maintenance, authentication/security acceptance, and deletion/trash semantics.
+Stock media metadata is proven without adding a Media or Attachment contract to Hibari core. WordPress attachments remain ordinary Posts with `post_type = attachment`, and attachment metadata remains the already-proven PostMeta / Dynamic Attributes path:
+
+```text
+wp_insert_attachment(...)
+get_post(...)
+update_attached_file(...)
+get_attached_file(...)
+wp_update_attachment_metadata(...)
+wp_get_attachment_metadata(...)
+```
+
+`_wp_attached_file` round-trips as a scalar Dynamic Attribute. Structured `_wp_attachment_metadata` stays WordPress-owned: WordPress serializes the nested PHP array, Hibari stores the resulting value opaquely, and WordPress unserializes it again on read. The proof found and fixed the generic WordPress metadata SQL-literal decoder so it now exactly reverses the `addslashes()` escaping used by `HibariWpdb::_real_escape()`; no media-specific serialized-data parser was added. Binary upload/blob storage, image resizing, EXIF extraction, CDN/object-storage behavior, arbitrary media-library `WP_Query`, and attachment deletion/cascade remain outside this proof.
+
+Remaining WordPress domains include broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` / `WP_Comment_Query` compatibility, termmeta, term-count/user-count/comment-count maintenance, authentication/security acceptance, and deletion/trash semantics.
 
 ## Development
 
@@ -193,4 +206,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, and Comment/CommentMeta proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, Comment/CommentMeta, and media metadata proofs. Live kintone credentials are not required.
