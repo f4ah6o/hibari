@@ -48,6 +48,7 @@ hibari_taxonomy_assert(
 hibari_taxonomy_assert(false === $GLOBALS['wpdb']->is_mysql, 'Hibari wpdb opened or advertised MySQL');
 
 $core_files = array(
+    'wp-includes/l10n.php',
     'wp-includes/class-wp-taxonomy.php',
     'wp-includes/class-wp-term.php',
     'wp-includes/class-wp-term-query.php',
