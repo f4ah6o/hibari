@@ -69,6 +69,8 @@ class FakeKintoneTransport {
   #nextOptionId = 3;
   #nextPostId = 1;
   #nextMetaId = 1;
+  #nextCursorId = 1;
+  #cursors = new Map();
   #optionRecords = new Map([
     [
       "1",
@@ -145,30 +147,65 @@ class FakeKintoneTransport {
     throw new Error(`Unexpected fake Kintone app ${app}`);
   }
 
+  #matchingRecords(app, query) {
+    if (Number(app) === 84) {
+      const name = this.#nameFromQuery(query);
+      const record = name === undefined ? undefined : this.#findOptionByName(name);
+      return record ? [record] : [];
+    }
+    if (Number(app) === 85) {
+      const id = this.#idFromQuery(query);
+      const record = id === undefined ? undefined : this.#postRecords.get(id);
+      return record ? [record] : [];
+    }
+    if (Number(app) === 86) {
+      return [...this.#metaRecords.values()]
+        .filter((record) => this.#metadataMatches(query, record))
+        .sort((left, right) => Number(left.id) - Number(right.id));
+    }
+    throw new Error(`Unexpected fake Kintone app ${app}`);
+  }
+
   async request(request) {
     appendFileSync(requestLog, `${JSON.stringify(request)}\n`);
     const app = request.body?.app;
 
+    if (request.method === "POST" && request.path.endsWith("/records/cursor.json")) {
+      const query = request.body?.query ?? "";
+      const records = this.#matchingRecords(app, query).map((record) =>
+        wrappedRecord(record, request.body?.fields)
+      );
+      const id = `cursor-${this.#nextCursorId++}`;
+      this.#cursors.set(id, {
+        records,
+        size: Number(request.body?.size ?? 500),
+        offset: 0
+      });
+      return { id, totalCount: String(records.length) };
+    }
+
+    if (request.method === "GET" && request.path.endsWith("/records/cursor.json")) {
+      const id = String(request.body?.id ?? "");
+      const cursor = this.#cursors.get(id);
+      if (!cursor) throw new Error(`Unknown fake Kintone cursor ${id}`);
+      const start = cursor.offset;
+      const records = cursor.records.slice(start, start + cursor.size);
+      cursor.offset += records.length;
+      const next = cursor.offset < cursor.records.length;
+      if (!next) this.#cursors.delete(id);
+      return { records, next };
+    }
+
+    if (request.method === "DELETE" && request.path.endsWith("/records/cursor.json")) {
+      this.#cursors.delete(String(request.body?.id ?? ""));
+      return {};
+    }
+
     if (request.method === "GET" && request.path.endsWith("/records.json")) {
       const query = request.body?.query ?? "";
-      let records = [];
-      if (Number(app) === 84) {
-        const name = this.#nameFromQuery(query);
-        const record = name === undefined ? undefined : this.#findOptionByName(name);
-        records = record ? [record] : [];
-      } else if (Number(app) === 85) {
-        const id = this.#idFromQuery(query);
-        const record = id === undefined ? undefined : this.#postRecords.get(id);
-        records = record ? [record] : [];
-      } else if (Number(app) === 86) {
-        records = [...this.#metaRecords.values()]
-          .filter((record) => this.#metadataMatches(query, record))
-          .sort((left, right) => Number(left.id) - Number(right.id));
-        const { limit, offset } = pageWindow(query);
-        records = records.slice(offset, limit === undefined ? undefined : offset + limit);
-      } else {
-        throw new Error(`Unexpected fake Kintone app ${app}`);
-      }
+      let records = this.#matchingRecords(app, query);
+      const { limit, offset } = pageWindow(query);
+      records = records.slice(offset, limit === undefined ? undefined : offset + limit);
       return {
         records: records.map((record) => wrappedRecord(record, request.body?.fields))
       };
