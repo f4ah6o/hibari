@@ -121,3 +121,6 @@ if ! grep -Fq 'Taxonomy = \"category\"' "$request_log"; then
   cat "$request_log" >&2
   exit 1
 fi
+
+echo "--- Kintone term creation request evidence ---"
+cat "$request_log"
