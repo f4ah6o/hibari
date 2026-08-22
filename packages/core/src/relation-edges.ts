@@ -86,7 +86,7 @@ function baseFilter(operation: RelationEdgeOperationIR): FilterExpression[] {
   return filters;
 }
 
-function pairFilter(operation: RelationEdgeLookupOperation | RelationEdgeAttachOperation): FilterExpression {
+function pairFilter(operation: RelationEdgeAttachOperation): FilterExpression {
   return and([
     ...baseFilter(operation),
     { op: "eq", field: operation.binding.rightField, value: operation.rightId }
@@ -207,14 +207,16 @@ function semanticCapabilities(
       return operation.rightId === undefined
         ? [["relationEdges.leftScopedLookup", capabilities.leftScopedLookup]]
         : [["relationEdges.pairLookup", capabilities.pairLookup]];
-    case "attach":
-      return [
+    case "attach": {
+      const result: [string, CapabilitySupport][] = [
         ["relationEdges.multiEdge", capabilities.multiEdge],
-        ["relationEdges.attach", capabilities.attach],
-        ...(operation.unique === false
-          ? []
-          : [["relationEdges.uniqueAttach", capabilities.uniqueAttach] as const])
+        ["relationEdges.attach", capabilities.attach]
       ];
+      if (operation.unique !== false) {
+        result.push(["relationEdges.uniqueAttach", capabilities.uniqueAttach]);
+      }
+      return result;
+    }
     case "detach":
       return [["relationEdges.detach", capabilities.detach]];
     case "replace":
