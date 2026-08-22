@@ -16,6 +16,7 @@ $hibari_root = defined('HIBARI_WORDPRESS_ROOT')
 require_once $hibari_root . '/src/Bridge.php';
 require_once $hibari_root . '/src/SqlPreflight.php';
 require_once $hibari_root . '/src/HibariWpdb.php';
+require_once $hibari_root . '/src/TaxonomyProjection.php';
 
 if (defined('HIBARI_WORDPRESS_BRIDGE_BOOTSTRAP')) {
     require_once HIBARI_WORDPRESS_BRIDGE_BOOTSTRAP;
@@ -38,3 +39,4 @@ if (!$hibari_bridge instanceof \Hibari\WordPress\Bridge) {
 }
 
 $GLOBALS['wpdb'] = new \Hibari\WordPress\HibariWpdb($hibari_bridge);
+\Hibari\WordPress\TaxonomyProjection::register($hibari_bridge);

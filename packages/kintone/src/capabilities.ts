@@ -45,6 +45,16 @@ export const kintoneCapabilities: CapabilityManifest = {
     uniqueAdd: "emulated",
     scan: "unsupported"
   },
+  relationEdges: {
+    leftScopedLookup: "native",
+    pairLookup: "native",
+    multiEdge: "native",
+    uniqueAttach: "emulated",
+    attach: "native",
+    detach: "emulated",
+    replace: "emulated",
+    scan: "unsupported"
+  },
   limits: {
     pageSize: 500,
     batchSize: 100,

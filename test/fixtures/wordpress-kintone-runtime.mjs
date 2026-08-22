@@ -69,6 +69,8 @@ class FakeKintoneTransport {
   #nextOptionId = 3;
   #nextPostId = 1;
   #nextMetaId = 1;
+  #nextTermTaxonomyId = 2;
+  #nextRelationshipId = 1;
   #nextCursorId = 1;
   #cursors = new Map();
   #optionRecords = new Map([
@@ -99,6 +101,23 @@ class FakeKintoneTransport {
   ]);
   #postRecords = new Map();
   #metaRecords = new Map();
+  #termTaxonomyRecords = new Map([
+    [
+      "1",
+      {
+        id: "1",
+        revision: 1,
+        fields: {
+          Term_id: 7,
+          Taxonomy: "category",
+          Description: "Hibari category context",
+          Parent: 0,
+          Count: 0
+        }
+      }
+    ]
+  ]);
+  #relationshipRecords = new Map();
 
   #nameFromQuery(query) {
     const match = /Option_name\s*=\s*"((?:\\.|[^"])*)"/.exec(query);
@@ -133,10 +152,49 @@ class FakeKintoneTransport {
     return true;
   }
 
+  #termTaxonomyMatches(query, record) {
+    const id = numericEquality(query, "$id");
+    if (id !== undefined && record.id !== id) return false;
+    const ids = numericIn(query, "$id");
+    if (ids !== undefined && !ids.includes(record.id)) return false;
+
+    const termId = numericEquality(query, "Term_id");
+    if (termId !== undefined && String(record.fields.Term_id) !== termId) return false;
+    const termIds = numericIn(query, "Term_id");
+    if (termIds !== undefined && !termIds.includes(String(record.fields.Term_id))) return false;
+
+    const taxonomy = stringEquality(query, "Taxonomy");
+    if (taxonomy !== undefined && record.fields.Taxonomy !== taxonomy) return false;
+    return true;
+  }
+
+  #relationshipMatches(query, record) {
+    const id = numericEquality(query, "$id");
+    if (id !== undefined && record.id !== id) return false;
+    const ids = numericIn(query, "$id");
+    if (ids !== undefined && !ids.includes(record.id)) return false;
+
+    const objectId = numericEquality(query, "Object_id");
+    if (objectId !== undefined && String(record.fields.Object_id) !== objectId) return false;
+    const objectIds = numericIn(query, "Object_id");
+    if (objectIds !== undefined && !objectIds.includes(String(record.fields.Object_id))) return false;
+
+    const termTaxonomyId = numericEquality(query, "Term_taxonomy_id");
+    if (termTaxonomyId !== undefined && String(record.fields.Term_taxonomy_id) !== termTaxonomyId) return false;
+    const termTaxonomyIds = numericIn(query, "Term_taxonomy_id");
+    if (
+      termTaxonomyIds !== undefined
+      && !termTaxonomyIds.includes(String(record.fields.Term_taxonomy_id))
+    ) return false;
+    return true;
+  }
+
   #store(app) {
     if (Number(app) === 84) return this.#optionRecords;
     if (Number(app) === 85) return this.#postRecords;
     if (Number(app) === 86) return this.#metaRecords;
+    if (Number(app) === 87) return this.#termTaxonomyRecords;
+    if (Number(app) === 88) return this.#relationshipRecords;
     throw new Error(`Unexpected fake Kintone app ${app}`);
   }
 
@@ -144,6 +202,8 @@ class FakeKintoneTransport {
     if (Number(app) === 84) return String(this.#nextOptionId++);
     if (Number(app) === 85) return String(this.#nextPostId++);
     if (Number(app) === 86) return String(this.#nextMetaId++);
+    if (Number(app) === 87) return String(this.#nextTermTaxonomyId++);
+    if (Number(app) === 88) return String(this.#nextRelationshipId++);
     throw new Error(`Unexpected fake Kintone app ${app}`);
   }
 
@@ -161,6 +221,16 @@ class FakeKintoneTransport {
     if (Number(app) === 86) {
       return [...this.#metaRecords.values()]
         .filter((record) => this.#metadataMatches(query, record))
+        .sort((left, right) => Number(left.id) - Number(right.id));
+    }
+    if (Number(app) === 87) {
+      return [...this.#termTaxonomyRecords.values()]
+        .filter((record) => this.#termTaxonomyMatches(query, record))
+        .sort((left, right) => Number(left.id) - Number(right.id));
+    }
+    if (Number(app) === 88) {
+      return [...this.#relationshipRecords.values()]
+        .filter((record) => this.#relationshipMatches(query, record))
         .sort((left, right) => Number(left.id) - Number(right.id));
     }
     throw new Error(`Unexpected fake Kintone app ${app}`);
@@ -301,6 +371,30 @@ const backend = new KintoneBackend(new FakeKintoneTransport(), [
       ownerId: "Post_id",
       key: "Meta_key",
       value: "Meta_value"
+    },
+    uniqueFields: ["id"]
+  },
+  {
+    model: "TermTaxonomy",
+    app: 87,
+    fieldCodes: {
+      id: "$id",
+      termId: "Term_id",
+      taxonomy: "Taxonomy",
+      description: "Description",
+      parent: "Parent",
+      count: "Count"
+    },
+    uniqueFields: ["id"]
+  },
+  {
+    model: "TermRelationship",
+    app: 88,
+    fieldCodes: {
+      id: "$id",
+      leftId: "Object_id",
+      rightId: "Term_taxonomy_id",
+      order: "Term_order"
     },
     uniqueFields: ["id"]
   }

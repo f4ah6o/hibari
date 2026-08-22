@@ -28,6 +28,8 @@ Consumers and backends depend on backend-neutral contracts. Consumer packages do
 - stable structured diagnostics
 - generic Dynamic Attributes contract for EAV-like owner/key/multi-value data
 - Dynamic Attribute operations lower to the existing Query / Mutation IR and use the same planner and diagnostics
+- generic Relation Edge contract for bounded many-to-many membership
+- Relation Edge lookup / attach / detach / replace operations lower to the same Query / Mutation IR and planner instead of introducing JOIN execution into core
 
 ### `@hibari/kintone`
 
@@ -42,6 +44,7 @@ Consumers and backends depend on backend-neutral contracts. Consumer packages do
 - injectable transport and fetch-based REST transport
 - kintone limits centralized in one Capability Manifest
 - Dynamic Attributes capability profile: owner/key lookup and multi-value are native, unique-add is explicit emulation, unbounded cross-owner scan is unsupported
+- Relation Edge capability profile: left-scoped/pair lookup, multi-edge, and attach are native; unique attach/detach/replace are explicit emulation; unbounded cross-owner scan is unsupported
 
 ### `@hibari/prisma`
 
@@ -89,7 +92,7 @@ The runtime integration path is:
 ```text
 stock WordPress 7.1
   -> db.php / HibariWpdb
-  -> WordPress SQL translator
+  -> WordPress translation / semantic projection
   -> PHP HTTP bridge
   -> @hibari/runtime-http
   -> @hibari/core
@@ -129,7 +132,18 @@ delete_post_meta()
 
 The proof preserves multiple values for the same owner/key and WordPress `unique=true` behavior. WordPress-specific SQL remains in the WordPress adapter, Dynamic Attributes lower to ordinary Hibari IR, and the kintone proof stores metadata in a separately bound record app without exposing its App ID or field codes to WordPress or core.
 
-Remaining WordPress domains include users, taxonomy, comments, media metadata, WP_Query/search compatibility, and eventually deletion/trash semantics once dependent domains are explicit.
+Stock category relationship membership is proven as generic Relation Edges:
+
+```text
+term_exists()
+wp_set_object_terms()
+wp_get_object_terms(..., fields=tt_ids)
+wp_remove_object_terms()
+```
+
+`WP_Term_Query` normally generates JOIN SQL for taxonomy reads. Hibari does not add JOIN execution to core: the WordPress consumer uses WordPress's `terms_pre_query` semantic short-circuit for the exact supported term-context and object-membership reads, issuing bounded `TermTaxonomy` and `TermRelationship` Hibari queries instead. The simple relationship pair lookup / insert / delete SQL that stock Core emits is translated narrowly in the WordPress adapter. Re-attaching the same object/term is proven not to create a duplicate edge. Arbitrary JOIN SQL remains unsupported.
+
+Term creation and name/slug uniqueness (`wp_insert_term()`), users, comments, media metadata, broader `WP_Query` / `WP_Term_Query` compatibility, term-count maintenance, and deletion/trash semantics remain separate compatibility domains.
 
 ## Development
 
@@ -138,4 +152,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, and postmeta Dynamic Attributes proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, and taxonomy Relation Edge proofs. Live kintone credentials are not required.

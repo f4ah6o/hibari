@@ -5,5 +5,6 @@ export * from "./mutation.js";
 export * from "./plan.js";
 export * from "./planner.js";
 export * from "./query.js";
+export * from "./relation-edges.js";
 export * from "./runtime.js";
 export * from "./schema.js";
