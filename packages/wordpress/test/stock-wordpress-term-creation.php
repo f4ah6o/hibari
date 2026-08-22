@@ -49,6 +49,7 @@ hibari_term_assert(false === $GLOBALS['wpdb']->is_mysql, 'Hibari wpdb opened or 
 
 $core_files = array(
     'wp-includes/l10n.php',
+    'wp-includes/kses.php',
     'wp-includes/post.php',
     'wp-includes/post-formats.php',
     'wp-includes/class-wp-taxonomy.php',
