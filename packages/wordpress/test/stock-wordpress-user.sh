@@ -113,8 +113,14 @@ if ! grep -Fq 'User_email = \"hibari.user@example.test\"' "$request_log"; then
   exit 1
 fi
 
-if ! grep -Fq 'Meta_key = \"nickname\"' "$request_log"; then
-  echo "User metadata did not use the Dynamic Attributes backend path" >&2
+if ! grep -Fq '"app":91,"record":{"User_id":{"value":1},"Meta_key":{"value":"nickname"},"Meta_value":{"value":"Hibari Nick"}' "$request_log"; then
+  echo "User nickname metadata was not persisted through Dynamic Attributes" >&2
+  cat "$request_log" >&2
+  exit 1
+fi
+
+if ! grep -Fq '"app":91,"query":"User_id in (1) order by $id asc"' "$request_log"; then
+  echo "User metadata was not read through the owner-scoped Dynamic Attributes path" >&2
   cat "$request_log" >&2
   exit 1
 fi
