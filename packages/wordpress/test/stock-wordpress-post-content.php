@@ -66,6 +66,7 @@ $GLOBALS['current_user'] = new WP_User(0);
 
 $core_files = array(
     'wp-includes/pluggable.php',
+    'wp-includes/theme.php',
     'wp-includes/class-wp-block-parser-block.php',
     'wp-includes/class-wp-block-parser-frame.php',
     'wp-includes/class-wp-block-parser.php',
