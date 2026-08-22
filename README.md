@@ -109,7 +109,7 @@ add_option()
 delete_option()
 ```
 
-`wp_options.option_name` is modeled as the backend-neutral unique `Option.name` field. Core's MySQL-specific `INSERT ... ON DUPLICATE KEY UPDATE` statement is normalized inside the WordPress consumer to Hibari `upsert`; generic MySQL compatibility is not added to the core or backend.
+`wp_options.option_name` is modeled as the backend-neutral unique `Option.name` field. Core's MySQL-specific `INSERT ... ON DUPLICATE KEY UPDATE` statement is normalized inside the WordPress consumer to Hibari `upsert`; generic MySQL compatibility is not added to the core or backend. The exact WordPress 7.1 autoload preload used by `wp_load_alloptions()` is also projected to an ordinary `Option` QueryIR rather than expanding generic SQL support.
 
 Stock page content create/read/update is also proven through unchanged public APIs:
 
@@ -143,7 +143,18 @@ wp_remove_object_terms()
 
 `WP_Term_Query` normally generates JOIN SQL for taxonomy reads. Hibari does not add JOIN execution to core: the WordPress consumer uses WordPress's `terms_pre_query` semantic short-circuit for the exact supported term-context and object-membership reads, issuing bounded `TermTaxonomy` and `TermRelationship` Hibari queries instead. The simple relationship pair lookup / insert / delete SQL that stock Core emits is translated narrowly in the WordPress adapter. Re-attaching the same object/term is proven not to create a duplicate edge. Arbitrary JOIN SQL remains unsupported.
 
-Term creation and name/slug uniqueness (`wp_insert_term()`), users, comments, media metadata, broader `WP_Query` / `WP_Term_Query` compatibility, term-count maintenance, and deletion/trash semantics remain separate compatibility domains.
+Stock term creation and duplicate rejection are now proven through unchanged public APIs too:
+
+```text
+wp_insert_term("Hibari Category", "category")
+term_exists($term_id, "category")
+get_term_by("slug", "hibari-category", "category")
+wp_insert_term("Hibari Category", "category") // WP_Error('term_exists')
+```
+
+`Term` and `TermTaxonomy` remain ordinary backend-neutral models. The two JOIN-shaped confidence/context checks emitted specifically by `wp_insert_term()` are decomposed inside the WordPress consumer into bounded Hibari queries; they do not enable generic JOIN execution. Hierarchical cache regeneration's exact `id=>parent` query is likewise projected from taxonomy-scoped `TermTaxonomy` records. The kintone proof verifies one Term write and one TermTaxonomy write, then rejects the duplicate without a second logical pair. Race-free atomic uniqueness across two backend apps is not claimed.
+
+Remaining WordPress domains include users, comments, media metadata, broader `WP_Query` / `WP_Term_Query` compatibility, termmeta, term-count maintenance, and deletion/trash semantics.
 
 ## Development
 
@@ -152,4 +163,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, and taxonomy Relation Edge proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, and term creation/uniqueness proofs. Live kintone credentials are not required.

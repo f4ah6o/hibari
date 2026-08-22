@@ -14,6 +14,13 @@ final class SqlPreflight {
         );
     }
 
+    private static function is_taxonomy_semantic_join($normalized) {
+        $existing_context = "/^SELECT\\s+tt\\.term_taxonomy_id\\s+FROM\\s+`?[A-Za-z0-9_]*term_taxonomy`?\\s+AS\\s+tt\\s+INNER\\s+JOIN\\s+`?[A-Za-z0-9_]*terms`?\\s+AS\\s+t\\s+ON\\s+tt\\.term_id\\s*=\\s*t\\.term_id\\s+WHERE\\s+tt\\.taxonomy\\s*=\\s*'(?:\\\\.|[^'])*'\\s+AND\\s+t\\.term_id\\s*=\\s*\\d+$/i";
+        $duplicate_confidence = "/^SELECT\\s+t\\.term_id\\s*,\\s*t\\.slug\\s*,\\s*tt\\.term_taxonomy_id\\s*,\\s*tt\\.taxonomy\\s+FROM\\s+`?[A-Za-z0-9_]*terms`?\\s+AS\\s+t\\s+INNER\\s+JOIN\\s+`?[A-Za-z0-9_]*term_taxonomy`?\\s+AS\\s+tt\\s+ON\\s*\\(\\s*tt\\.term_id\\s*=\\s*t\\.term_id\\s*\\)\\s+WHERE\\s+t\\.slug\\s*=\\s*'(?:\\\\.|[^'])*'\\s+AND\\s+tt\\.parent\\s*=\\s*\\d+\\s+AND\\s+tt\\.taxonomy\\s*=\\s*'(?:\\\\.|[^'])*'\\s+AND\\s+t\\.term_id\\s*<\\s*\\d+\\s+AND\\s+tt\\.term_taxonomy_id\\s*!=\\s*\\d+$/i";
+        return (bool) preg_match($existing_context, $normalized)
+            || (bool) preg_match($duplicate_confidence, $normalized);
+    }
+
     /**
      * Consumer-level SQL preflight only. Backend-specific capability planning
      * happens after the bridge boundary.
@@ -52,7 +59,7 @@ final class SqlPreflight {
             );
         }
 
-        if (preg_match('/\bJOIN\b/i', $normalized)) {
+        if (preg_match('/\bJOIN\b/i', $normalized) && !self::is_taxonomy_semantic_join($normalized)) {
             self::unsupported(
                 'HIB-WP-JOIN-001',
                 'JOIN semantics are not part of the initial portable WordPress SQL subset.',
