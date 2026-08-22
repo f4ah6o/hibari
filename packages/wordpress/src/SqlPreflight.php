@@ -7,10 +7,15 @@ final class SqlPreflight {
         throw new CompatibilityException($code, $message, $capability, $sql);
     }
 
-    private static function is_postmeta_existence_count($normalized) {
+    private static function is_dynamic_attribute_existence_count($normalized) {
         return (bool) preg_match(
-            "/^SELECT\\s+COUNT\\(\\*\\)\\s+FROM\\s+`?[A-Za-z0-9_]*postmeta`?\\s+WHERE\\s+`?meta_key`?\\s*=\\s*'(?:\\\\.|[^'])*'\\s+AND\\s+`?post_id`?\\s*=\\s*\\d+$/i",
-            $normalized
+            "/^SELECT\\s+COUNT\\(\\*\\)\\s+FROM\\s+`?[A-Za-z0-9_]*(postmeta|usermeta|commentmeta)`?\\s+WHERE\\s+`?meta_key`?\\s*=\\s*'(?:\\\\.|[^'])*'\\s+AND\\s+`?(post_id|user_id|comment_id)`?\\s*=\\s*\\d+$/i",
+            $normalized,
+            $matches
+        ) && (
+            ('postmeta' === strtolower($matches[1]) && 'post_id' === strtolower($matches[2]))
+            || ('usermeta' === strtolower($matches[1]) && 'user_id' === strtolower($matches[2]))
+            || ('commentmeta' === strtolower($matches[1]) && 'comment_id' === strtolower($matches[2]))
         );
     }
 
@@ -68,10 +73,10 @@ final class SqlPreflight {
             );
         }
 
-        $postmeta_existence_count = self::is_postmeta_existence_count($normalized);
+        $dynamic_attribute_existence_count = self::is_dynamic_attribute_existence_count($normalized);
         if (
             preg_match('/\bGROUP\s+BY\b/i', $normalized)
-            || (preg_match('/\b(COUNT|SUM|AVG|MIN|MAX)\s*\(/i', $normalized) && !$postmeta_existence_count)
+            || (preg_match('/\b(COUNT|SUM|AVG|MIN|MAX)\s*\(/i', $normalized) && !$dynamic_attribute_existence_count)
         ) {
             self::unsupported(
                 'HIB-WP-AGG-001',
