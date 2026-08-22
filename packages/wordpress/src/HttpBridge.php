@@ -93,7 +93,10 @@ final class HttpBridge implements OperationBridge {
             return $semantic;
         }
 
-        $translation = PostmetaSqlTranslator::translate($sql);
+        $translation = OptionPreloadSqlTranslator::translate($sql);
+        if (null === $translation) {
+            $translation = PostmetaSqlTranslator::translate($sql);
+        }
         if (null === $translation) {
             $translation = TaxonomySqlTranslator::translate($sql);
         }
