@@ -48,7 +48,10 @@ hibari_post_assert(
 hibari_post_assert(false === $GLOBALS['wpdb']->is_mysql, 'Hibari wpdb opened or advertised MySQL');
 
 // SHORTINIT intentionally keeps the proof away from the full site/plugin/theme
-// boot. Load the stock Core modules needed by the public post APIs themselves.
+// boot. Load only the stock Core modules needed by the public post APIs.
+require_once $wordpress_root . '/wp-includes/option.php';
+wp_cookie_constants();
+
 $core_files = array(
     'wp-includes/capabilities.php',
     'wp-includes/class-wp-roles.php',
