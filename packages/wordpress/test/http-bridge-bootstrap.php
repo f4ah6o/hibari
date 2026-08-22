@@ -5,6 +5,7 @@ require_once HIBARI_WORDPRESS_ROOT . '/src/OptionPreloadSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/MetadataSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/PostmetaSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/UsermetaSqlTranslator.php';
+require_once HIBARI_WORDPRESS_ROOT . '/src/UserSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/TaxonomySqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/HttpBridge.php';
 
