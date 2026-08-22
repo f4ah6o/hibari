@@ -26,6 +26,32 @@ final class WordPressSqlTranslator {
         'autoload' => 'autoload',
     );
 
+    private static $post_fields = array(
+        'id' => 'id',
+        'post_author' => 'authorId',
+        'post_date' => 'date',
+        'post_date_gmt' => 'dateGmt',
+        'post_content' => 'content',
+        'post_title' => 'title',
+        'post_excerpt' => 'excerpt',
+        'post_status' => 'status',
+        'comment_status' => 'commentStatus',
+        'ping_status' => 'pingStatus',
+        'post_password' => 'password',
+        'post_name' => 'slug',
+        'to_ping' => 'toPing',
+        'pinged' => 'pinged',
+        'post_modified' => 'modified',
+        'post_modified_gmt' => 'modifiedGmt',
+        'post_content_filtered' => 'contentFiltered',
+        'post_parent' => 'parentId',
+        'guid' => 'guid',
+        'menu_order' => 'menuOrder',
+        'post_type' => 'type',
+        'post_mime_type' => 'mimeType',
+        'comment_count' => 'commentCount',
+    );
+
     private static function sql_string($value) {
         return str_replace(array("\\'", "\\\\"), array("'", "\\"), $value);
     }
@@ -44,7 +70,7 @@ final class WordPressSqlTranslator {
 
         throw new CompatibilityException(
             'HIB-WP-SQL-001',
-            'Unsupported SQL literal in WordPress option statement.',
+            'Unsupported SQL literal in WordPress statement.',
             'wordpress.sql.translation',
             $sql
         );
@@ -96,7 +122,7 @@ final class WordPressSqlTranslator {
     }
 
     private static function option_field($column, $sql) {
-        $column = trim($column, " `\t\n\r\0\x0B");
+        $column = strtolower(trim($column, " `\t\n\r\0\x0B"));
         if (!isset(self::$option_fields[$column])) {
             throw new CompatibilityException(
                 'HIB-WP-SQL-001',
@@ -106,6 +132,19 @@ final class WordPressSqlTranslator {
             );
         }
         return self::$option_fields[$column];
+    }
+
+    private static function post_field($column, $sql) {
+        $column = strtolower(trim($column, " `\t\n\r\0\x0B"));
+        if (!isset(self::$post_fields[$column])) {
+            throw new CompatibilityException(
+                'HIB-WP-SQL-001',
+                'Unsupported wp_posts column in Hibari WordPress translation.',
+                'wordpress.sql.translation',
+                $sql
+            );
+        }
+        return self::$post_fields[$column];
     }
 
     private static function option_select($normalized, $sql) {
@@ -141,7 +180,7 @@ final class WordPressSqlTranslator {
             if (!preg_match('/^`?([A-Za-z0-9_]+)`?\\s*=\\s*(.+)$/s', $assignment, $parts)) {
                 throw new CompatibilityException('HIB-WP-SQL-001', 'Unsupported wp_options UPDATE assignment.', 'wordpress.sql.translation', $sql);
             }
-            $field = self::option_field(strtolower($parts[1]), $sql);
+            $field = self::option_field($parts[1], $sql);
             if ('name' === $field) {
                 throw new CompatibilityException('HIB-WP-SQL-001', 'Renaming WordPress options is not supported.', 'wordpress.sql.translation', $sql);
             }
@@ -191,7 +230,7 @@ final class WordPressSqlTranslator {
 
         $record = array();
         foreach ($columns as $index => $column) {
-            $field = self::option_field(strtolower(trim($column, " `\t\n\r\0\x0B")), $sql);
+            $field = self::option_field($column, $sql);
             $record[$field] = self::sql_value($values[$index], $sql);
         }
         if (!isset($record['name'])) {
@@ -213,6 +252,115 @@ final class WordPressSqlTranslator {
         );
     }
 
+    private static function post_select_by_id($normalized, $sql) {
+        $pattern = '/^SELECT\\s+(\\*|`?[A-Za-z0-9_]+`?)\\s+FROM\\s+`?([A-Za-z0-9_]*posts)`?\\s+WHERE\\s+`?ID`?\\s*=\\s*([^\\s]+)(?:\\s+LIMIT\\s+1)?$/i';
+        if (!preg_match($pattern, $normalized, $matches)) {
+            return null;
+        }
+
+        $id = self::sql_value($matches[3], $sql);
+        if (!is_int($id) && !is_float($id)) {
+            throw new CompatibilityException('HIB-WP-SQL-001', 'wp_posts ID lookup requires a numeric ID.', 'wordpress.sql.translation', $sql);
+        }
+
+        $columns = array();
+        $projection = null;
+        if ('*' === $matches[1]) {
+            foreach (self::$post_fields as $column => $field) {
+                $columns[$field] = 'id' === $column ? 'ID' : $column;
+            }
+        } else {
+            $column = trim($matches[1], '`');
+            $field = self::post_field($column, $sql);
+            $projection = array($field);
+            $columns[$field] = 0 === strcasecmp($column, 'ID') ? 'ID' : strtolower($column);
+        }
+
+        $operation = array(
+            'kind' => 'query',
+            'model' => 'Post',
+            'filter' => array('op' => 'eq', 'field' => 'id', 'value' => (int) $id),
+            'limit' => 1,
+        );
+        if (null !== $projection) {
+            $operation['projection'] = $projection;
+        }
+
+        return new SqlTranslation('query', $operation, $columns);
+    }
+
+    private static function post_insert($normalized, $sql) {
+        $pattern = '/^INSERT\\s+INTO\\s+`?([A-Za-z0-9_]*posts)`?\\s*\\((.+)\\)\\s+VALUES\\s*\\((.+)\\)$/i';
+        if (!preg_match($pattern, $normalized, $matches)) {
+            return null;
+        }
+
+        $columns = self::split_list($matches[2]);
+        $values = self::split_list($matches[3]);
+        if (count($columns) !== count($values)) {
+            throw new CompatibilityException('HIB-WP-SQL-001', 'wp_posts INSERT column/value count mismatch.', 'wordpress.sql.translation', $sql);
+        }
+
+        $record = array();
+        foreach ($columns as $index => $column) {
+            $field = self::post_field($column, $sql);
+            if ('id' === $field) {
+                throw new CompatibilityException(
+                    'HIB-WP-SQL-001',
+                    'Explicit WordPress post IDs are not supported by the Kintone-backed proof.',
+                    'wordpress.sql.translation',
+                    $sql
+                );
+            }
+            $record[$field] = self::sql_value($values[$index], $sql);
+        }
+
+        return new SqlTranslation(
+            'mutation',
+            array(
+                'kind' => 'mutation',
+                'operation' => 'insert',
+                'model' => 'Post',
+                'record' => $record,
+            )
+        );
+    }
+
+    private static function post_update_by_id($normalized, $sql) {
+        $pattern = '/^UPDATE\\s+`?([A-Za-z0-9_]*posts)`?\\s+SET\\s+(.+)\\s+WHERE\\s+`?ID`?\\s*=\\s*([^\\s]+)$/i';
+        if (!preg_match($pattern, $normalized, $matches)) {
+            return null;
+        }
+
+        $changes = array();
+        foreach (self::split_list($matches[2]) as $assignment) {
+            if (!preg_match('/^`?([A-Za-z0-9_]+)`?\\s*=\\s*(.+)$/s', $assignment, $parts)) {
+                throw new CompatibilityException('HIB-WP-SQL-001', 'Unsupported wp_posts UPDATE assignment.', 'wordpress.sql.translation', $sql);
+            }
+            $field = self::post_field($parts[1], $sql);
+            if ('id' === $field) {
+                throw new CompatibilityException('HIB-WP-SQL-001', 'Changing WordPress post IDs is not supported.', 'wordpress.sql.translation', $sql);
+            }
+            $changes[$field] = self::sql_value($parts[2], $sql);
+        }
+
+        $id = self::sql_value($matches[3], $sql);
+        if (!is_int($id) && !is_float($id)) {
+            throw new CompatibilityException('HIB-WP-SQL-001', 'wp_posts UPDATE requires a numeric ID.', 'wordpress.sql.translation', $sql);
+        }
+
+        return new SqlTranslation(
+            'mutation',
+            array(
+                'kind' => 'mutation',
+                'operation' => 'update',
+                'model' => 'Post',
+                'where' => array('op' => 'eq', 'field' => 'id', 'value' => (int) $id),
+                'changes' => $changes,
+            )
+        );
+    }
+
     /**
      * Translate only stock WordPress SQL shapes explicitly proven by tests.
      * WordPress schema knowledge belongs here, not in @hibari/core or a backend.
@@ -220,7 +368,15 @@ final class WordPressSqlTranslator {
     public static function translate($sql) {
         $normalized = rtrim(preg_replace('/\\s+/', ' ', trim((string) $sql)), ';');
 
-        foreach (array('option_select', 'option_update', 'option_delete', 'option_insert_upsert') as $translator) {
+        foreach (array(
+            'option_select',
+            'option_update',
+            'option_delete',
+            'option_insert_upsert',
+            'post_select_by_id',
+            'post_insert',
+            'post_update_by_id',
+        ) as $translator) {
             $result = call_user_func(array(__CLASS__, $translator), $normalized, $sql);
             if (null !== $result) {
                 return $result;
