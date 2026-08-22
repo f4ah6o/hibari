@@ -76,7 +76,10 @@ final class HttpBridge implements Bridge {
     }
 
     public function execute($sql, $plan) {
-        $translation = WordPressSqlTranslator::translate($sql);
+        $translation = PostmetaSqlTranslator::translate($sql);
+        if (null === $translation) {
+            $translation = WordPressSqlTranslator::translate($sql);
+        }
         $decoded = $this->request('/v1/' . $translation->endpoint, $translation->operation, $sql);
 
         $rows = array();
