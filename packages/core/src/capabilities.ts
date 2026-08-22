@@ -29,6 +29,21 @@ export interface TransactionCapabilities {
   readonly interactive: CapabilitySupport;
 }
 
+/**
+ * Portable semantics required by EAV / dynamic-attribute consumers.
+ *
+ * This describes meaning, not a physical table/app layout. A backend may store
+ * attributes as rows, documents, or another representation as long as it can
+ * preserve these capabilities.
+ */
+export interface DynamicAttributeCapabilities {
+  readonly ownerKeyLookup: CapabilitySupport;
+  readonly ownerKeyValueLookup: CapabilitySupport;
+  readonly multiValue: CapabilitySupport;
+  readonly uniqueAdd: CapabilitySupport;
+  readonly scan: CapabilitySupport;
+}
+
 export interface CapabilityLimits {
   readonly pageSize?: number;
   readonly batchSize?: number;
@@ -42,6 +57,7 @@ export interface CapabilityManifest {
   readonly query: QueryCapabilities;
   readonly mutation: MutationCapabilities;
   readonly transaction: TransactionCapabilities;
+  readonly dynamicAttributes?: DynamicAttributeCapabilities;
   readonly limits?: CapabilityLimits;
   readonly extensions?: Readonly<Record<string, unknown>>;
 }

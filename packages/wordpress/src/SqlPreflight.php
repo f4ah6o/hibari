@@ -7,6 +7,13 @@ final class SqlPreflight {
         throw new CompatibilityException($code, $message, $capability, $sql);
     }
 
+    private static function is_postmeta_existence_count($normalized) {
+        return (bool) preg_match(
+            "/^SELECT\\s+COUNT\\(\\*\\)\\s+FROM\\s+`?[A-Za-z0-9_]*postmeta`?\\s+WHERE\\s+`?meta_key`?\\s*=\\s*'(?:\\\\.|[^'])*'\\s+AND\\s+`?post_id`?\\s*=\\s*\\d+$/i",
+            $normalized
+        );
+    }
+
     /**
      * Consumer-level SQL preflight only. Backend-specific capability planning
      * happens after the bridge boundary.
@@ -54,7 +61,11 @@ final class SqlPreflight {
             );
         }
 
-        if (preg_match('/\bGROUP\s+BY\b/i', $normalized) || preg_match('/\b(COUNT|SUM|AVG|MIN|MAX)\s*\(/i', $normalized)) {
+        $postmeta_existence_count = self::is_postmeta_existence_count($normalized);
+        if (
+            preg_match('/\bGROUP\s+BY\b/i', $normalized)
+            || (preg_match('/\b(COUNT|SUM|AVG|MIN|MAX)\s*\(/i', $normalized) && !$postmeta_existence_count)
+        ) {
             self::unsupported(
                 'HIB-WP-AGG-001',
                 'Aggregate SQL is not part of the initial portable WordPress SQL subset.',
