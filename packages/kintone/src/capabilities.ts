@@ -38,6 +38,13 @@ export const kintoneCapabilities: CapabilityManifest = {
     atomicBatch: "unsupported",
     interactive: "unsupported"
   },
+  dynamicAttributes: {
+    ownerKeyLookup: "native",
+    ownerKeyValueLookup: "native",
+    multiValue: "native",
+    uniqueAdd: "emulated",
+    scan: "unsupported"
+  },
   limits: {
     pageSize: 500,
     batchSize: 100,
