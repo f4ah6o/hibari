@@ -160,8 +160,12 @@ final class MetadataSqlTranslator {
             );
         }
 
-        $pattern = "/^UPDATE\\s+`?($table)`?\\s+SET\\s+`?meta_value`?\\s*=\\s*('(?:\\\\.|[^'])*')\\s+WHERE\\s+`?$owner`?\\s*=\\s*(\\d+)\\s+AND\\s+`?meta_key`?\\s*=\\s*('(?:\\\\.|[^'])*')(?:\\s+AND\\s+`?meta_value`?\\s*=\\s*('(?:\\\\.|[^'])*'))?$/i";
+        $pattern = "/^UPDATE\\s+`?($table)`?\\s+SET\\s+`?meta_value`?\\s*=\\s*('(?:\\\\.|[^'])*')\\s+WHERE\\s+`?$owner`?\\s*=\\s*(\\d+|'\\d+')\\s+AND\\s+`?meta_key`?\\s*=\\s*('(?:\\\\.|[^'])*')(?:\\s+AND\\s+`?meta_value`?\\s*=\\s*('(?:\\\\.|[^'])*'))?$/i";
         if (preg_match($pattern, $normalized, $matches)) {
+            $owner_value = self::sql_value($matches[3], $sql, $code, $label);
+            if (!is_numeric($owner_value)) {
+                throw new CompatibilityException($code, $label . ' owner ID must be numeric.', 'wordpress.dynamicAttributes', $sql);
+            }
             $include_previous = isset($matches[5]) && '' !== $matches[5];
             $previous = $include_previous ? self::sql_value($matches[5], $sql, $code, $label) : null;
             return new SqlTranslation(
@@ -171,7 +175,7 @@ final class MetadataSqlTranslator {
                     'operation' => 'updateMany',
                     'model' => $model,
                     'where' => self::owner_key_filter(
-                        (int) $matches[3],
+                        (int) $owner_value,
                         self::sql_value($matches[4], $sql, $code, $label),
                         $previous,
                         $include_previous
