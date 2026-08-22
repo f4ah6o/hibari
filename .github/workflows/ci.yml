@@ -102,3 +102,14 @@ jobs:
       - run: php -v
       - run: npm install
       - run: bash packages/wordpress/test/stock-wordpress-user.sh
+
+  wordpress-comment-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: php -v
+      - run: npm install
+      - run: bash packages/wordpress/test/stock-wordpress-comment.sh
