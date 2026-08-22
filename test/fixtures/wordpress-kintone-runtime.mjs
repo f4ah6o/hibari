@@ -34,9 +34,41 @@ function applyWrapped(record, wrapped) {
   record.revision += 1;
 }
 
+function numericEquality(query, field) {
+  const escaped = field.replace(/[$]/g, "\\$");
+  const match = new RegExp(`${escaped}\\s*=\\s*(?:\"(\\d+)\"|(\\d+))`, "i").exec(query);
+  return match ? String(match[1] ?? match[2]) : undefined;
+}
+
+function stringEquality(query, field) {
+  const escaped = field.replace(/[$]/g, "\\$");
+  const match = new RegExp(`${escaped}\\s*=\\s*\"((?:\\\\.|[^\"])*)\"`, "i").exec(query);
+  return match ? unescapeKintoneString(match[1]) : undefined;
+}
+
+function numericIn(query, field) {
+  const escaped = field.replace(/[$]/g, "\\$");
+  const match = new RegExp(`${escaped}\\s+in\\s*\\(([^)]*)\\)`, "i").exec(query);
+  if (!match) return undefined;
+  return match[1]
+    .split(",")
+    .map((value) => value.trim().replace(/^\"|\"$/g, ""))
+    .filter((value) => /^\d+$/.test(value));
+}
+
+function pageWindow(query) {
+  const limit = /\blimit\s+(\d+)/i.exec(query);
+  const offset = /\boffset\s+(\d+)/i.exec(query);
+  return {
+    limit: limit ? Number(limit[1]) : undefined,
+    offset: offset ? Number(offset[1]) : 0
+  };
+}
+
 class FakeKintoneTransport {
   #nextOptionId = 3;
   #nextPostId = 1;
+  #nextMetaId = 1;
   #optionRecords = new Map([
     [
       "1",
@@ -64,6 +96,7 @@ class FakeKintoneTransport {
     ]
   ]);
   #postRecords = new Map();
+  #metaRecords = new Map();
 
   #nameFromQuery(query) {
     const match = /Option_name\s*=\s*"((?:\\.|[^"])*)"/.exec(query);
@@ -71,8 +104,7 @@ class FakeKintoneTransport {
   }
 
   #idFromQuery(query) {
-    const match = /\$id\s*=\s*(?:"(\d+)"|(\d+))/.exec(query);
-    return match ? String(match[1] ?? match[2]) : undefined;
+    return numericEquality(query, "$id");
   }
 
   #findOptionByName(name) {
@@ -81,15 +113,35 @@ class FakeKintoneTransport {
     );
   }
 
+  #metadataMatches(query, record) {
+    const id = numericEquality(query, "$id");
+    if (id !== undefined && record.id !== id) return false;
+    const ids = numericIn(query, "$id");
+    if (ids !== undefined && !ids.includes(record.id)) return false;
+
+    const owner = numericEquality(query, "Post_id");
+    if (owner !== undefined && String(record.fields.Post_id) !== owner) return false;
+    const owners = numericIn(query, "Post_id");
+    if (owners !== undefined && !owners.includes(String(record.fields.Post_id))) return false;
+
+    const key = stringEquality(query, "Meta_key");
+    if (key !== undefined && record.fields.Meta_key !== key) return false;
+    const value = stringEquality(query, "Meta_value");
+    if (value !== undefined && record.fields.Meta_value !== value) return false;
+    return true;
+  }
+
   #store(app) {
     if (Number(app) === 84) return this.#optionRecords;
     if (Number(app) === 85) return this.#postRecords;
+    if (Number(app) === 86) return this.#metaRecords;
     throw new Error(`Unexpected fake Kintone app ${app}`);
   }
 
   #newId(app) {
     if (Number(app) === 84) return String(this.#nextOptionId++);
     if (Number(app) === 85) return String(this.#nextPostId++);
+    if (Number(app) === 86) return String(this.#nextMetaId++);
     throw new Error(`Unexpected fake Kintone app ${app}`);
   }
 
@@ -99,18 +151,26 @@ class FakeKintoneTransport {
 
     if (request.method === "GET" && request.path.endsWith("/records.json")) {
       const query = request.body?.query ?? "";
-      let record;
+      let records = [];
       if (Number(app) === 84) {
         const name = this.#nameFromQuery(query);
-        record = name === undefined ? undefined : this.#findOptionByName(name);
+        const record = name === undefined ? undefined : this.#findOptionByName(name);
+        records = record ? [record] : [];
       } else if (Number(app) === 85) {
         const id = this.#idFromQuery(query);
-        record = id === undefined ? undefined : this.#postRecords.get(id);
+        const record = id === undefined ? undefined : this.#postRecords.get(id);
+        records = record ? [record] : [];
+      } else if (Number(app) === 86) {
+        records = [...this.#metaRecords.values()]
+          .filter((record) => this.#metadataMatches(query, record))
+          .sort((left, right) => Number(left.id) - Number(right.id));
+        const { limit, offset } = pageWindow(query);
+        records = records.slice(offset, limit === undefined ? undefined : offset + limit);
       } else {
         throw new Error(`Unexpected fake Kintone app ${app}`);
       }
       return {
-        records: record ? [wrappedRecord(record, request.body?.fields)] : []
+        records: records.map((record) => wrappedRecord(record, request.body?.fields))
       };
     }
 
@@ -194,6 +254,17 @@ const backend = new KintoneBackend(new FakeKintoneTransport(), [
     model: "Post",
     app: 85,
     fieldCodes: postFieldCodes,
+    uniqueFields: ["id"]
+  },
+  {
+    model: "PostMeta",
+    app: 86,
+    fieldCodes: {
+      id: "$id",
+      ownerId: "Post_id",
+      key: "Meta_key",
+      value: "Meta_value"
+    },
     uniqueFields: ["id"]
   }
 ]);
