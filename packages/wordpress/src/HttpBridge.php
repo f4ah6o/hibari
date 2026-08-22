@@ -2,7 +2,7 @@
 
 namespace Hibari\WordPress;
 
-final class HttpBridge implements Bridge {
+final class HttpBridge implements OperationBridge {
     /** @var string */
     private $base_url;
 
@@ -14,18 +14,18 @@ final class HttpBridge implements Bridge {
         $this->timeout = (float) $timeout;
     }
 
-    private function request($path, $operation, $sql) {
+    private function request($path, $operation, $context) {
         $payload = json_encode($operation);
         if (false === $payload) {
             throw new CompatibilityException(
                 'HIB-WP-SQL-001',
                 'Unable to serialize translated Hibari operation.',
                 'wordpress.runtime.transport',
-                $sql
+                $context
             );
         }
 
-        $context = stream_context_create(array(
+        $http_context = stream_context_create(array(
             'http' => array(
                 'method' => 'POST',
                 'header' => "Content-Type: application/json\r\nConnection: close\r\n",
@@ -35,7 +35,7 @@ final class HttpBridge implements Bridge {
             ),
         ));
 
-        $body = @file_get_contents($this->base_url . $path, false, $context);
+        $body = @file_get_contents($this->base_url . $path, false, $http_context);
         $status = 0;
         if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
             $status = (int) $matches[1];
@@ -46,7 +46,7 @@ final class HttpBridge implements Bridge {
                 'HIB-WP-RUNTIME-001',
                 'Unable to reach the Hibari runtime transport.',
                 'wordpress.runtime.transport',
-                $sql
+                $context
             );
         }
 
@@ -56,7 +56,7 @@ final class HttpBridge implements Bridge {
                 'HIB-WP-RUNTIME-002',
                 'Hibari runtime returned an invalid JSON response.',
                 'wordpress.runtime.transport',
-                $sql
+                $context
             );
         }
 
@@ -68,19 +68,34 @@ final class HttpBridge implements Bridge {
                 isset($diagnostic['code']) ? $diagnostic['code'] : 'HIB-WP-RUNTIME-003',
                 isset($decoded['error']['message']) ? $decoded['error']['message'] : 'Hibari runtime request failed.',
                 isset($diagnostic['capability']) ? $diagnostic['capability'] : 'wordpress.runtime.transport',
-                $sql
+                $context
             );
         }
 
         return $decoded;
     }
 
+    public function executeOperation($endpoint, $operation, $context = '') {
+        if ('query' !== $endpoint && 'mutation' !== $endpoint) {
+            throw new CompatibilityException(
+                'HIB-WP-RUNTIME-004',
+                'Unsupported Hibari runtime endpoint requested by the WordPress adapter.',
+                'wordpress.runtime.transport',
+                $context
+            );
+        }
+        return $this->request('/v1/' . $endpoint, $operation, $context);
+    }
+
     public function execute($sql, $plan) {
         $translation = PostmetaSqlTranslator::translate($sql);
         if (null === $translation) {
+            $translation = TaxonomySqlTranslator::translate($sql);
+        }
+        if (null === $translation) {
             $translation = WordPressSqlTranslator::translate($sql);
         }
-        $decoded = $this->request('/v1/' . $translation->endpoint, $translation->operation, $sql);
+        $decoded = $this->executeOperation($translation->endpoint, $translation->operation, $sql);
 
         $rows = array();
         foreach (isset($decoded['records']) && is_array($decoded['records']) ? $decoded['records'] : array() as $record) {
