@@ -49,6 +49,15 @@ class HibariWpdb extends \wpdb {
     }
 
     /**
+     * Core post persistence asks wpdb for the column charset before encoding
+     * emoji. The Hibari boundary is UTF-8 and has no MySQL metadata connection,
+     * so report the configured logical charset directly.
+     */
+    public function get_col_charset($table, $column) {
+        return $this->charset ? $this->charset : 'utf8mb4';
+    }
+
+    /**
      * Route wpdb operations into the backend-neutral Hibari bridge.
      *
      * @param string $query
