@@ -76,6 +76,7 @@ $core_files = array(
     'wp-includes/post.php',
     'wp-includes/class-wp-post-type.php',
     'wp-includes/class-wp-post.php',
+    'wp-includes/nav-menu.php',
     'wp-includes/taxonomy.php',
     'wp-includes/class-wp-taxonomy.php',
     'wp-includes/class-wp-term.php',
