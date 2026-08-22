@@ -67,6 +67,9 @@ $GLOBALS['current_user'] = new WP_User(0);
 require_once $wordpress_root . '/wp-includes/pluggable.php';
 
 wp_installing(true);
+// User-count maintenance is an aggregate side domain. Keep Hibari aggregate SQL
+// unsupported in this focused entity/metadata proof rather than enabling COUNT(*).
+remove_action('user_register', 'wp_maybe_update_user_counts');
 
 $plain_password = 'HibariUserProofPlaintext-DoNotLog-2026!';
 $user_id = wp_insert_user(
