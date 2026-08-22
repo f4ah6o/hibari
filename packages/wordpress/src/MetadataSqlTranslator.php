@@ -139,8 +139,12 @@ final class MetadataSqlTranslator {
             );
         }
 
-        $pattern = "/^INSERT\\s+INTO\\s+`?($table)`?\\s*\\(\\s*`?$owner`?\\s*,\\s*`?meta_key`?\\s*,\\s*`?meta_value`?\\s*\\)\\s+VALUES\\s*\\(\\s*(\\d+)\\s*,\\s*('(?:\\\\.|[^'])*')\\s*,\\s*('(?:\\\\.|[^'])*')\\s*\\)$/i";
+        $pattern = "/^INSERT\\s+INTO\\s+`?($table)`?\\s*\\(\\s*`?$owner`?\\s*,\\s*`?meta_key`?\\s*,\\s*`?meta_value`?\\s*\\)\\s+VALUES\\s*\\(\\s*(\\d+|'\\d+')\\s*,\\s*('(?:\\\\.|[^'])*')\\s*,\\s*('(?:\\\\.|[^'])*')\\s*\\)$/i";
         if (preg_match($pattern, $normalized, $matches)) {
+            $owner_value = self::sql_value($matches[2], $sql, $code, $label);
+            if (!is_numeric($owner_value)) {
+                throw new CompatibilityException($code, $label . ' owner ID must be numeric.', 'wordpress.dynamicAttributes', $sql);
+            }
             return new SqlTranslation(
                 'mutation',
                 array(
@@ -148,7 +152,7 @@ final class MetadataSqlTranslator {
                     'operation' => 'insert',
                     'model' => $model,
                     'record' => array(
-                        'ownerId' => (int) $matches[2],
+                        'ownerId' => (int) $owner_value,
                         'key' => self::sql_value($matches[3], $sql, $code, $label),
                         'value' => self::sql_value($matches[4], $sql, $code, $label),
                     ),
