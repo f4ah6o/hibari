@@ -94,6 +94,10 @@ remove_action('post_updated', 'wp_check_for_changed_dates', 12);
 // this focused datastore proof on attachment-as-Post semantics by using the
 // stock Core short-circuit hooks rather than teaching Hibari generic WP_Query.
 add_filter('add_trashed_suffix_to_trashed_posts', '__return_false');
+// default-filters.php wires this template-specific callback before the
+// corresponding full-bootstrap module is loaded. SHORTINIT intentionally omits
+// that module, and template slug semantics are outside this proof.
+remove_filter('pre_wp_unique_post_slug', 'wp_filter_wp_template_unique_post_slug', 10);
 add_filter(
     'pre_wp_unique_post_slug',
     static function ($override, $slug) {
