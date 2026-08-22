@@ -90,6 +90,19 @@ remove_action('post_updated', 'wp_save_post_revision', 10);
 remove_action('post_updated', 'wp_check_for_changed_slugs', 12);
 remove_action('post_updated', 'wp_check_for_changed_dates', 12);
 
+// Slug collision discovery is a separate WP_Query compatibility domain. Keep
+// this focused datastore proof on attachment-as-Post semantics by using the
+// stock Core short-circuit hooks rather than teaching Hibari generic WP_Query.
+add_filter('add_trashed_suffix_to_trashed_posts', '__return_false');
+add_filter(
+    'pre_wp_unique_post_slug',
+    static function ($override, $slug) {
+        return $slug;
+    },
+    10,
+    2
+);
+
 $attachment_id = wp_insert_attachment(
     array(
         'post_author' => 0,
