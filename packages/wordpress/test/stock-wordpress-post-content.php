@@ -68,6 +68,7 @@ $core_files = array(
     'wp-includes/pluggable.php',
     'wp-includes/theme.php',
     'wp-includes/author-template.php',
+    'wp-includes/general-template.php',
     'wp-includes/class-wp-block-parser-block.php',
     'wp-includes/class-wp-block-parser-frame.php',
     'wp-includes/class-wp-block-parser.php',
