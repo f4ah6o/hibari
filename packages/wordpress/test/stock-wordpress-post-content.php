@@ -48,16 +48,23 @@ hibari_post_assert(
 hibari_post_assert(false === $GLOBALS['wpdb']->is_mysql, 'Hibari wpdb opened or advertised MySQL');
 
 // SHORTINIT intentionally keeps the proof away from the full site/plugin/theme
-// boot. Load only the stock Core modules needed by the public post APIs.
-require_once $wordpress_root . '/wp-includes/option.php';
-wp_cookie_constants();
-
-$core_files = array(
+// boot. Load only stock Core modules required by the public post APIs. Seed an
+// anonymous WP_User before pluggable.php so current-user resolution does not
+// consult authentication cookies or the user datastore, which are separate
+// WordPress consumer domains.
+$core_before_user = array(
     'wp-includes/capabilities.php',
     'wp-includes/class-wp-roles.php',
     'wp-includes/class-wp-role.php',
     'wp-includes/class-wp-user.php',
     'wp-includes/user.php',
+);
+foreach ($core_before_user as $core_file) {
+    require_once $wordpress_root . '/' . $core_file;
+}
+$GLOBALS['current_user'] = new WP_User(0);
+
+$core_files = array(
     'wp-includes/pluggable.php',
     'wp-includes/post.php',
     'wp-includes/class-wp-post-type.php',
