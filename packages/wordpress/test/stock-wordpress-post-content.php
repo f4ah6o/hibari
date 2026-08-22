@@ -91,6 +91,15 @@ foreach ($core_files as $core_file) {
 
 wp_installing(true);
 
+// default-filters.php registers lifecycle callbacks that belong to domains
+// explicitly excluded by this child. Do not load revision/postmeta semantics
+// merely to make the post-row proof pass; remove those callbacks while leaving
+// wp_insert_post()/wp_update_post() themselves untouched.
+remove_action('wp_after_insert_post', 'wp_save_post_revision_on_insert', 9);
+remove_action('post_updated', 'wp_save_post_revision', 10);
+remove_action('post_updated', 'wp_check_for_changed_slugs', 12);
+remove_action('post_updated', 'wp_check_for_changed_dates', 12);
+
 $post_id = wp_insert_post(
     array(
         'post_author' => 0,
