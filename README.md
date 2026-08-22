@@ -167,11 +167,24 @@ wp_update_user(...)
 
 `wp_users` is projected to an ordinary backend-neutral `User` model. Login, email, ID, and nicename checks are narrow scalar QueryIR operations; insert/update use ordinary MutationIR. Duplicate login and duplicate email are rejected by stock WordPress as `existing_user_login` and `existing_user_email`, and the proof verifies only one User create reaches the backend.
 
-`wp_usermeta` reuses the same Dynamic Attributes contract as postmeta. The WordPress adapter now factors the common EAV SQL shapes into a configurable metadata translator, with PostMeta and UserMeta supplying only their table/owner/id/model configuration. Stock default user metadata such as `nickname`, names, editor preferences, capabilities, and user level is persisted through that common path.
+`wp_usermeta` reuses the same Dynamic Attributes contract as postmeta. The WordPress adapter factors the common EAV SQL shapes into a configurable metadata translator, with PostMeta and UserMeta supplying only their table/owner/id/model configuration. Stock default user metadata such as `nickname`, names, editor preferences, capabilities, and user level is persisted through that common path.
 
 WordPress hashes the supplied password before the User write. Hibari treats that stored value as opaque data and does not hash or verify passwords. The proof verifies the persisted value differs from the plaintext and survives a basic update unchanged, while the fake Kintone request evidence replaces the credential field with `[REDACTED]` before logging and fails if fixture plaintext or recognizable password-hash material appears. Authentication, sessions, password verification/reset, authorization behavior, and approval to store production credential hashes in live kintone remain separate security domains. User-count `COUNT(*)` maintenance also remains outside this proof so aggregate SQL stays unsupported.
 
-Remaining WordPress domains include comments, media metadata, broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` compatibility, termmeta, term-count/user-count maintenance, authentication/security acceptance, and deletion/trash semantics.
+Stock Comment entity and CommentMeta create/read/update are now proven through the same generic contracts:
+
+```text
+wp_insert_comment(..., comment_meta => ...)
+get_comment(...)
+get_comment_meta(...)
+wp_update_comment(..., comment_meta => ...)
+```
+
+`wp_comments` is projected to an ordinary backend-neutral `Comment` model using narrow ID lookup / insert / update translation. `wp_commentmeta` is the third consumer of the same configurable Dynamic Attributes translator after PostMeta and UserMeta; it supplies only its table suffix, owner/id columns, model name, and diagnostic code. WordPress may serialize `comment_id` as a quoted numeric SQL literal because it is not one of wpdb's integer field aliases, so the metadata translator normalizes only bare or quoted numeric owner IDs before lowering them to the same integer `ownerId` contract.
+
+The Comment proof deliberately calls `wp_defer_comment_counting(true)` and does not flush it. This isolates comment-count recomputation, which uses aggregate SQL, without returning fake counts or enabling a generic aggregate engine. The narrow metadata `unique=true` existence check remains a bounded Dynamic Attributes lookup; arbitrary aggregate SQL remains unsupported.
+
+Remaining WordPress domains include media metadata, broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` / `WP_Comment_Query` compatibility, termmeta, term-count/user-count/comment-count maintenance, authentication/security acceptance, and deletion/trash semantics.
 
 ## Development
 
@@ -180,4 +193,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, term creation/uniqueness, and User/UserMeta proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, and Comment/CommentMeta proofs. Live kintone credentials are not required.
