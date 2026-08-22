@@ -54,6 +54,11 @@ $core_before_user = array(
     'wp-includes/class-wp-role.php',
     'wp-includes/class-wp-user.php',
     'wp-includes/user.php',
+    'wp-includes/class-wp-block-parser-block.php',
+    'wp-includes/class-wp-block-parser-frame.php',
+    'wp-includes/class-wp-block-parser.php',
+    'wp-includes/blocks.php',
+    'wp-includes/kses.php',
 );
 foreach ($core_before_user as $core_file) {
     require_once $wordpress_root . '/' . $core_file;
