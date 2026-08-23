@@ -52,14 +52,66 @@ final class WordPressSqlTranslator {
         'comment_count' => 'commentCount',
     );
 
-    private static function sql_string($value) {
-        return str_replace(array("\\'", "\\\\"), array("'", "\\"), $value);
+    private static function sql_string_literal($token, $sql) {
+        $length = strlen($token);
+        if ($length < 2 || "'" !== $token[0] || "'" !== $token[$length - 1]) {
+            return null;
+        }
+
+        $decoded = '';
+        for ($index = 1; $index < $length - 1; ++$index) {
+            $char = $token[$index];
+            if ("'" === $char) {
+                throw new CompatibilityException(
+                    'HIB-WP-SQL-001',
+                    'Unescaped quote in WordPress SQL string literal.',
+                    'wordpress.sql.translation',
+                    $sql
+                );
+            }
+            if ('\\' !== $char) {
+                $decoded .= $char;
+                continue;
+            }
+
+            if ($index + 1 >= $length - 1) {
+                throw new CompatibilityException(
+                    'HIB-WP-SQL-001',
+                    'Incomplete escape in WordPress SQL string literal.',
+                    'wordpress.sql.translation',
+                    $sql
+                );
+            }
+
+            $escaped = $token[++$index];
+            if ('0' === $escaped) {
+                $decoded .= "\0";
+            } elseif ('"' === $escaped) {
+                $decoded .= '"';
+            } elseif ("'" === $escaped) {
+                $decoded .= "'";
+            } elseif ('\\' === $escaped) {
+                $decoded .= '\\';
+            } else {
+                throw new CompatibilityException(
+                    'HIB-WP-SQL-001',
+                    'Unsupported escape in WordPress SQL string literal.',
+                    'wordpress.sql.translation',
+                    $sql
+                );
+            }
+        }
+
+        return $decoded;
     }
 
     private static function sql_value($token, $sql) {
         $token = trim($token);
-        if (preg_match("/^'((?:\\\\.|[^'])*)'$/s", $token, $matches)) {
-            return self::sql_string($matches[1]);
+        if (strlen($token) >= 2 && "'" === $token[0]) {
+            $value = self::sql_string_literal($token, $sql);
+            if (null !== $value) {
+                return $value;
+            }
         }
         if (0 === strcasecmp($token, 'NULL')) {
             return null;
