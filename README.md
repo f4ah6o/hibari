@@ -197,6 +197,17 @@ wp_get_attachment_metadata(...)
 
 `_wp_attached_file` round-trips as a scalar Dynamic Attribute. Structured `_wp_attachment_metadata` stays WordPress-owned: WordPress serializes the nested PHP array, Hibari stores the resulting value opaquely, and WordPress unserializes it again on read. The proof found and fixed the generic WordPress metadata SQL-literal decoder so it now exactly reverses the `addslashes()` escaping used by `HibariWpdb::_real_escape()`; no media-specific serialized-data parser was added. Binary upload/blob storage, image resizing, EXIF extraction, CDN/object-storage behavior, arbitrary media-library `WP_Query`, and attachment deletion/cascade remain outside this proof.
 
+Stock draft-to-publish persistence is proven through the existing Post model with no workflow/state-machine contract in core:
+
+```text
+wp_insert_post(... post_status=draft ...)
+get_post(...)
+wp_publish_post(...)
+get_post(...)
+```
+
+The draft row is written to the ordinary Post binding, and `wp_publish_post()` lowers through the already-proven update-by-ID path to a mutation containing only `Post.status = publish`. The proof confirms the Post identity, title, content, type, and parent remain stable. Default publish lifecycle callbacks for GUID/cache/term-count/fresh-site maintenance are explicitly isolated in the SHORTINIT harness rather than emulated; notification, revision, plugin/theme, and other publish side effects are not claimed.
+
 Remaining WordPress domains include broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` / `WP_Comment_Query` compatibility, termmeta, term-count/user-count/comment-count maintenance, authentication/security acceptance, and deletion/trash semantics.
 
 ## Development
@@ -206,4 +217,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, Comment/CommentMeta, and media metadata proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, Comment/CommentMeta, media metadata, and draft/publish state proofs. Live kintone credentials are not required.
