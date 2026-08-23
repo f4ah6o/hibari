@@ -75,6 +75,7 @@ class FakeKintoneTermTransport {
   #nextOptionId = 2;
   #nextTermId = 1;
   #nextTermTaxonomyId = 1;
+  #nextRelationshipId = 1;
   #nextCursorId = 1;
   #cursors = new Map();
 
@@ -95,6 +96,7 @@ class FakeKintoneTermTransport {
 
   #termRecords = new Map();
   #termTaxonomyRecords = new Map();
+  #relationshipRecords = new Map();
 
   #optionMatches(query, record) {
     const name = stringEquality(query, "Option_name");
@@ -135,9 +137,31 @@ class FakeKintoneTermTransport {
     return true;
   }
 
+  #relationshipMatches(query, record) {
+    const id = numericEquality(query, "$id");
+    if (id !== undefined && record.id !== id) return false;
+    const ids = numericIn(query, "$id");
+    if (ids !== undefined && !ids.includes(record.id)) return false;
+
+    const objectId = numericEquality(query, "Object_id");
+    if (objectId !== undefined && String(record.fields.Object_id) !== objectId) return false;
+    const objectIds = numericIn(query, "Object_id");
+    if (objectIds !== undefined && !objectIds.includes(String(record.fields.Object_id))) return false;
+
+    const termTaxonomyId = numericEquality(query, "Term_taxonomy_id");
+    if (termTaxonomyId !== undefined && String(record.fields.Term_taxonomy_id) !== termTaxonomyId) return false;
+    const termTaxonomyIds = numericIn(query, "Term_taxonomy_id");
+    if (
+      termTaxonomyIds !== undefined
+      && !termTaxonomyIds.includes(String(record.fields.Term_taxonomy_id))
+    ) return false;
+    return true;
+  }
+
   #store(app) {
     if (Number(app) === 84) return this.#optionRecords;
     if (Number(app) === 87) return this.#termTaxonomyRecords;
+    if (Number(app) === 88) return this.#relationshipRecords;
     if (Number(app) === 89) return this.#termRecords;
     throw new Error(`Unexpected fake Kintone app ${app}`);
   }
@@ -145,6 +169,7 @@ class FakeKintoneTermTransport {
   #newId(app) {
     if (Number(app) === 84) return String(this.#nextOptionId++);
     if (Number(app) === 87) return String(this.#nextTermTaxonomyId++);
+    if (Number(app) === 88) return String(this.#nextRelationshipId++);
     if (Number(app) === 89) return String(this.#nextTermId++);
     throw new Error(`Unexpected fake Kintone app ${app}`);
   }
@@ -156,6 +181,10 @@ class FakeKintoneTermTransport {
     } else if (Number(app) === 87) {
       records = [...this.#termTaxonomyRecords.values()].filter((record) =>
         this.#termTaxonomyMatches(query, record)
+      );
+    } else if (Number(app) === 88) {
+      records = [...this.#relationshipRecords.values()].filter((record) =>
+        this.#relationshipMatches(query, record)
       );
     } else if (Number(app) === 89) {
       records = [...this.#termRecords.values()].filter((record) => this.#termMatches(query, record));
@@ -260,6 +289,17 @@ const backend = new KintoneBackend(new FakeKintoneTermTransport(), [
       description: "Description",
       parent: "Parent",
       count: "Count"
+    },
+    uniqueFields: ["id"]
+  },
+  {
+    model: "TermRelationship",
+    app: 88,
+    fieldCodes: {
+      id: "$id",
+      leftId: "Object_id",
+      rightId: "Term_taxonomy_id",
+      order: "Term_order"
     },
     uniqueFields: ["id"]
   },

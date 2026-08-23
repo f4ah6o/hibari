@@ -2,7 +2,7 @@
 
 ## Status
 
-Open
+Closed
 
 ## Parent
 
@@ -70,16 +70,16 @@ Do not enable generic JOIN execution. If stock `post_tag` emits a new shape, add
 
 ## Acceptance criteria
 
-- [ ] no Tag-specific concept is added to Hibari core
-- [ ] Term / TermTaxonomy contracts are reused unchanged
-- [ ] Relation Edge contract is reused unchanged
-- [ ] stock `wp_insert_term(..., post_tag)` creates through KintoneBackend
-- [ ] stock term lookup observes the tag
-- [ ] stock `wp_set_object_terms()` attaches the tag through Relation Edge
-- [ ] stock `wp_get_object_terms()` observes membership
-- [ ] stock `wp_remove_object_terms()` detaches membership
-- [ ] arbitrary JOIN SQL remains unsupported
-- [ ] all previous core/kintone/Prisma/WordPress proofs remain green
+- [x] no Tag-specific concept is added to Hibari core
+- [x] Term / TermTaxonomy contracts are reused unchanged
+- [x] Relation Edge contract is reused unchanged
+- [x] stock `wp_insert_term(..., post_tag)` creates through KintoneBackend
+- [x] stock term lookup observes the tag
+- [x] stock `wp_set_object_terms()` attaches the tag through Relation Edge
+- [x] stock `wp_get_object_terms()` observes membership
+- [x] stock `wp_remove_object_terms()` detaches membership
+- [x] arbitrary JOIN SQL remains unsupported
+- [x] all previous core/kintone/Prisma/WordPress proofs remain green
 
 ## Guardrails
 
@@ -90,10 +90,14 @@ Do not enable generic JOIN execution. If stock `post_tag` emits a new shape, add
 - do not require a live Post row for object ID 42
 - do not require live kintone credentials
 
-## Completion evidence required
+## Completion evidence
 
-- stock WordPress 7.1 tag public API output
-- fake Kintone evidence for Term / TermTaxonomy create and Relation Edge attach/detach
-- proof that `taxonomy = post_tag` stays a scalar/context rather than a new core type
-- full CI including every previous proof
-- exact revision/run recorded before moving to `issues/closed`
+- proof revision: `eeba44fe3254d1c65e7716919708c13fed13610d`
+- CI #217 / run `32608637501`: success, 13/13 jobs green
+- `wordpress-tag-proof` job `97117800492`: `WordPress post_tag Term + Relation Edge -> Hibari -> KintoneBackend proof: ok`
+- fake Kintone evidence:
+  - app 89 creates `Term_name = Hibari Tag`, `Slug = hibari-tag`
+  - app 87 creates one context with `Taxonomy = post_tag`, `Parent = 0`, `Count = 0`
+  - app 88 creates the object `42` -> term-taxonomy edge, bounded reads observe it, and DELETE removes it
+- no production Tag/Category core model or taxonomy-name branch was added; the existing Term / TermTaxonomy / Relation Edge contracts are reused
+- term-count aggregation remains deferred and arbitrary JOIN SQL remains unsupported
