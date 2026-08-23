@@ -84,7 +84,7 @@ if ! grep -Fq 'Autoload in (' "$request_log"; then
   exit 1
 fi
 
-if grep -Eq '"app":(?!84)' "$request_log" 2>/dev/null; then
+if grep -F '"app":' "$request_log" | grep -Fvq '"app":84'; then
   echo "Normal bootstrap unexpectedly used a non-Option Kintone app" >&2
   cat "$request_log" >&2
   exit 1
