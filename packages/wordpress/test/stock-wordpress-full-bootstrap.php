@@ -54,7 +54,12 @@ $config .= "if (!defined('ABSPATH')) { define('ABSPATH', __DIR__ . '/'); }\n";
 $config .= "require_once ABSPATH . 'wp-settings.php';\n";
 file_put_contents($wordpress_root . '/wp-config.php', $config);
 
-require $wordpress_root . '/wp-load.php';
+try {
+    require $wordpress_root . '/wp-load.php';
+} catch (\Hibari\WordPress\CompatibilityException $exception) {
+    fwrite(STDERR, "Hibari full-bootstrap SQL failure: " . $exception->sql . "\n");
+    throw $exception;
+}
 
 hibari_full_bootstrap_assert(
     !defined('SHORTINIT'),
