@@ -62,8 +62,8 @@ try {
 }
 
 hibari_full_bootstrap_assert(
-    !defined('SHORTINIT'),
-    'full-bootstrap proof unexpectedly defined SHORTINIT'
+    defined('SHORTINIT') && false === SHORTINIT,
+    'normal WordPress bootstrap must define SHORTINIT=false'
 );
 hibari_full_bootstrap_assert(
     $GLOBALS['wpdb'] instanceof \Hibari\WordPress\HibariWpdb,
