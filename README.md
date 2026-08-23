@@ -221,6 +221,20 @@ get_post(...)
 
 The draft row is written to the ordinary Post binding, and `wp_publish_post()` lowers through the already-proven update-by-ID path to a mutation containing only `Post.status = publish`. The proof confirms the Post identity, title, content, type, and parent remain stable. Default publish lifecycle callbacks for GUID/cache/term-count/fresh-site maintenance are explicitly isolated in the SHORTINIT harness rather than emulated; notification, revision, plugin/theme, and other publish side effects are not claimed.
 
+Stock page force-delete is now proven too, closing the previously deferred Delete part of the basic page CRUD proof for a revision-free draft page:
+
+```text
+wp_insert_post(... post_type=page, post_status=draft ...)
+add_post_meta(...)
+wp_insert_comment(...)
+wp_delete_post($id, true)
+get_post($id)        // absent
+get_post_meta(...)   // absent
+get_comment(...)     // absent
+```
+
+WordPress Core retains ownership of cascade ordering. The WordPress consumer projects only its exact bounded lifecycle selectors and delete shapes into the existing Post, Comment, and Dynamic Attributes QueryIR/MutationIR contracts. Fake Kintone evidence shows the dependent Comment is deleted first, dependent PostMeta next, and the final Post row last; subsequent public reads observe no record. The fake backend performs no hidden cascade, and `@hibari/core` gains no WordPress-specific cascade primitive or generic SQL DELETE engine. Revision deletion, navigation-menu/customize dependent cleanup, normal-post taxonomy-edge cascade, attachment/file deletion, and trash/restore semantics remain separate work.
+
 Stock WordPress 7.1 normal bootstrap is now proven without the earlier `SHORTINIT=true` isolation:
 
 ```text
@@ -235,7 +249,7 @@ The proof downloads the exact stock WordPress 7.1 tarball, discovers a bundled t
 
 Normal bootstrap also exercises WordPress autoload Option preloading, ordinary Option reads/writes, transient storage, and `wp_prime_option_caches()` bounded multi-option reads. Hibari translates only the exact `option_name IN (...)` cache-prime shape into ordinary Option QueryIR. Large serialized block/theme transient values remain opaque and are decoded from SQL with a linear `addslashes()`-inverse scanner rather than a WordPress serialization parser. No Theme/filesystem concept, generic JOIN execution, aggregate engine, or new backend contract is added to core.
 
-Remaining WordPress domains include broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` / `WP_Comment_Query` compatibility, termmeta, term-count/user-count/comment-count maintenance, authentication/security acceptance, deletion/trash semantics, and actual front-page/template rendering.
+Remaining WordPress domains include broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` / `WP_Comment_Query` compatibility, termmeta, term-count/user-count/comment-count maintenance, authentication/security acceptance, broader deletion/trash/restore semantics, and actual front-page/template rendering.
 
 ## Development
 
@@ -244,4 +258,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, category/tag taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, Comment/CommentMeta, media metadata, draft/publish state, and normal full-bootstrap/bundled-theme proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRUD including force-delete cascade, postmeta Dynamic Attributes, category/tag taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, Comment/CommentMeta, media metadata, draft/publish state, and normal full-bootstrap/bundled-theme proofs. Live kintone credentials are not required.
