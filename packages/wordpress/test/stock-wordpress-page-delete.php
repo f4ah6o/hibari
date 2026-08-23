@@ -81,6 +81,7 @@ $core_files = array(
     'wp-includes/post.php',
     'wp-includes/class-wp-post-type.php',
     'wp-includes/class-wp-post.php',
+    'wp-includes/revision.php',
     'wp-includes/nav-menu.php',
     'wp-includes/taxonomy.php',
     'wp-includes/class-wp-taxonomy.php',
@@ -97,8 +98,8 @@ foreach ($core_files as $core_file) {
 wp_installing(true);
 create_initial_post_types();
 
-// Revision persistence is still a separate domain. Keep the brand-new draft
-// page revision-free while leaving wp_delete_post() itself unchanged.
+// Load revision helpers because stock Metadata APIs call wp_is_post_revision(),
+// but keep revision persistence itself disabled for this brand-new draft page.
 remove_action('wp_after_insert_post', 'wp_save_post_revision_on_insert', 9);
 remove_action('post_updated', 'wp_save_post_revision', 10);
 remove_action('post_updated', 'wp_check_for_changed_slugs', 12);
