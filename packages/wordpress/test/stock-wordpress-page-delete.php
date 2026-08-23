@@ -105,6 +105,12 @@ remove_action('post_updated', 'wp_save_post_revision', 10);
 remove_action('post_updated', 'wp_check_for_changed_slugs', 12);
 remove_action('post_updated', 'wp_check_for_changed_dates', 12);
 
+// SHORTINIT leaves font-management callbacks registered by default-filters.php
+// without loading their implementation. They only apply to wp_font_face /
+// wp_font_family posts, not to this built-in page proof.
+remove_action('before_delete_post', '_wp_before_delete_font_face', 10);
+remove_action('deleted_post', '_wp_after_delete_font_family', 10);
+
 try {
     $post_id = wp_insert_post(
         array(
