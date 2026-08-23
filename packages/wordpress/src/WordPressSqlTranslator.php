@@ -169,6 +169,41 @@ final class WordPressSqlTranslator {
         );
     }
 
+    private static function option_select_names($normalized, $sql) {
+        $pattern = "/^SELECT\\s+`?option_name`?\\s*,\\s*`?option_value`?\\s+FROM\\s+`?([A-Za-z0-9_]*options)`?\\s+WHERE\\s+`?option_name`?\\s+IN\\s*\\((.+)\\)$/i";
+        if (!preg_match($pattern, $normalized, $matches)) {
+            return null;
+        }
+
+        $names = array();
+        foreach (self::split_list($matches[2]) as $token) {
+            $name = self::sql_value($token, $sql);
+            if (!is_string($name)) {
+                throw new CompatibilityException(
+                    'HIB-WP-SQL-001',
+                    'wp_options cache-prime lookup requires string option names.',
+                    'wordpress.sql.translation',
+                    $sql
+                );
+            }
+            $names[] = $name;
+        }
+        if (empty($names)) {
+            return null;
+        }
+
+        return new SqlTranslation(
+            'query',
+            array(
+                'kind' => 'query',
+                'model' => 'Option',
+                'projection' => array('name', 'value'),
+                'filter' => array('op' => 'in', 'field' => 'name', 'value' => $names),
+            ),
+            array('name' => 'option_name', 'value' => 'option_value')
+        );
+    }
+
     private static function option_update($normalized, $sql) {
         $pattern = "/^UPDATE\\s+`?([A-Za-z0-9_]*options)`?\\s+SET\\s+(.+)\\s+WHERE\\s+`?option_name`?\\s*=\\s*('(?:\\\\.|[^'])*')$/i";
         if (!preg_match($pattern, $normalized, $matches)) {
@@ -370,6 +405,7 @@ final class WordPressSqlTranslator {
 
         foreach (array(
             'option_select',
+            'option_select_names',
             'option_update',
             'option_delete',
             'option_insert_upsert',
