@@ -94,6 +94,14 @@ remove_action('post_updated', 'wp_save_post_revision', 10);
 remove_action('post_updated', 'wp_check_for_changed_slugs', 12);
 remove_action('post_updated', 'wp_check_for_changed_dates', 12);
 
+// Stock wp_publish_post() persists post_status before firing lifecycle hooks.
+// The default transition callbacks own GUID/cache/term-count and fresh-site
+// side effects that require modules/domains intentionally omitted by SHORTINIT.
+// Remove only those registered Core side effects; do not replace or fake them.
+remove_action('transition_post_status', '_transition_post_status', 5);
+remove_action('transition_post_status', '_update_term_count_on_transition_post_status', 10);
+remove_action('publish_page', '_delete_option_fresh_site', 0);
+
 $post_id = wp_insert_post(
     array(
         'post_author' => 0,
