@@ -86,11 +86,11 @@ require_request '"method":"DELETE","path":"/k/v1/records.json","body":{"app":86'
   "wp_delete_post() did not delete dependent PostMeta through app 86"
 require_request '"method":"DELETE","path":"/k/v1/records.json","body":{"app":85' \
   "wp_delete_post() did not delete the page Post through app 85"
-require_request 'Post_parent = "1"' \
+require_request 'Post_parent = 1' \
   "wp_delete_post() did not execute the bounded parent-scoped Post lifecycle query"
-require_request 'Comment_post_ID = "1"' \
+require_request 'Comment_post_ID = 1' \
   "wp_delete_post() did not enumerate dependent comments by post ID"
-require_request 'Post_id = "1"' \
+require_request 'Post_id = 1' \
   "wp_delete_post() did not enumerate dependent PostMeta by owner ID"
 
 echo "--- Kintone page-delete request evidence ---"
