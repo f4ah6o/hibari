@@ -198,7 +198,7 @@ final class WordPressSqlTranslator {
                 'kind' => 'query',
                 'model' => 'Option',
                 'projection' => array('name', 'value'),
-                'filter' => array('op' => 'in', 'field' => 'name', 'value' => $names),
+                'filter' => array('op' => 'in', 'field' => 'name', 'values' => $names),
             ),
             array('name' => 'option_name', 'value' => 'option_value')
         );
