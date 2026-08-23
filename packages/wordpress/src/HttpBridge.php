@@ -104,13 +104,22 @@ final class HttpBridge implements OperationBridge {
             $translation = CommentmetaSqlTranslator::translate($sql);
         }
         if (null === $translation) {
+            $translation = MetadataLifecycleSqlTranslator::translate($sql);
+        }
+        if (null === $translation) {
             $translation = UserSqlTranslator::translate($sql);
+        }
+        if (null === $translation) {
+            $translation = CommentLifecycleSqlTranslator::translate($sql);
         }
         if (null === $translation) {
             $translation = CommentSqlTranslator::translate($sql);
         }
         if (null === $translation) {
             $translation = TaxonomySqlTranslator::translate($sql);
+        }
+        if (null === $translation) {
+            $translation = PostLifecycleSqlTranslator::translate($sql);
         }
         if (null === $translation) {
             $translation = WordPressSqlTranslator::translate($sql);
