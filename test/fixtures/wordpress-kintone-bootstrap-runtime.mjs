@@ -106,6 +106,23 @@ class FakeKintoneBootstrapTransport {
 
   async request(request) {
     appendFileSync(requestLog, `${JSON.stringify(request)}\n`);
+
+    if (request.method === "GET" && request.path.endsWith("/records/cursor.json")) {
+      const id = String(request.body?.id ?? "");
+      const cursor = this.#cursors.get(id);
+      if (!cursor) throw new Error(`Unknown fake Kintone cursor ${id}`);
+      const start = cursor.offset;
+      const records = cursor.records.slice(start, start + cursor.size);
+      cursor.offset += records.length;
+      const next = cursor.offset < cursor.records.length;
+      return { records, next };
+    }
+
+    if (request.method === "DELETE" && request.path.endsWith("/records/cursor.json")) {
+      this.#cursors.delete(String(request.body?.id ?? ""));
+      return {};
+    }
+
     if (Number(request.body?.app) !== 84) {
       throw new Error(`Full bootstrap unexpectedly requested non-Option app ${request.body?.app}`);
     }
@@ -121,23 +138,6 @@ class FakeKintoneBootstrapTransport {
         offset: 0
       });
       return { id, totalCount: String(records.length) };
-    }
-
-    if (request.method === "GET" && request.path.endsWith("/records/cursor.json")) {
-      const id = String(request.body?.id ?? "");
-      const cursor = this.#cursors.get(id);
-      if (!cursor) throw new Error(`Unknown fake Kintone cursor ${id}`);
-      const start = cursor.offset;
-      const records = cursor.records.slice(start, start + cursor.size);
-      cursor.offset += records.length;
-      const next = cursor.offset < cursor.records.length;
-      if (!next) this.#cursors.delete(id);
-      return { records, next };
-    }
-
-    if (request.method === "DELETE" && request.path.endsWith("/records/cursor.json")) {
-      this.#cursors.delete(String(request.body?.id ?? ""));
-      return {};
     }
 
     if (request.method === "GET" && request.path.endsWith("/records.json")) {
