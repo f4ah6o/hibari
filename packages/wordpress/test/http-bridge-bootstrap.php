@@ -6,9 +6,12 @@ require_once HIBARI_WORDPRESS_ROOT . '/src/MetadataSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/PostmetaSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/UsermetaSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/CommentmetaSqlTranslator.php';
+require_once HIBARI_WORDPRESS_ROOT . '/src/MetadataLifecycleSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/UserSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/CommentSqlTranslator.php';
+require_once HIBARI_WORDPRESS_ROOT . '/src/CommentLifecycleSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/TaxonomySqlTranslator.php';
+require_once HIBARI_WORDPRESS_ROOT . '/src/PostLifecycleSqlTranslator.php';
 require_once HIBARI_WORDPRESS_ROOT . '/src/HttpBridge.php';
 
 $GLOBALS['hibari_wordpress_bridge_factory'] = function () {
