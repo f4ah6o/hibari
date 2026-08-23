@@ -154,6 +154,19 @@ wp_insert_term("Hibari Category", "category") // WP_Error('term_exists')
 
 `Term` and `TermTaxonomy` remain ordinary backend-neutral models. The two JOIN-shaped confidence/context checks emitted specifically by `wp_insert_term()` are decomposed inside the WordPress consumer into bounded Hibari queries; they do not enable generic JOIN execution. Hierarchical cache regeneration's exact `id=>parent` query is likewise projected from taxonomy-scoped `TermTaxonomy` records. The kintone proof verifies one Term write and one TermTaxonomy write, then rejects the duplicate without a second logical pair. Race-free atomic uniqueness across two backend apps is not claimed.
 
+The same taxonomy contracts are now proven for stock `post_tag`, confirming that the implementation is not category-specific:
+
+```text
+wp_insert_term("Hibari Tag", "post_tag")
+term_exists(..., "post_tag")
+get_term_by("slug", ..., "post_tag")
+wp_set_object_terms(..., "post_tag")
+wp_get_object_terms(..., "post_tag", fields=tt_ids)
+wp_remove_object_terms(..., "post_tag")
+```
+
+`post_tag` remains only a `TermTaxonomy.taxonomy` value. Tag creation uses the existing `Term` and `TermTaxonomy` models, and object membership uses the existing generic Relation Edge contract. The proof creates, reads, attaches, observes, and detaches one tag without introducing Tag/Category entity types, taxonomy-name-specific core behavior, generic JOIN execution, or term-count aggregation.
+
 Stock User entity create/read/update and duplicate checks are also proven:
 
 ```text
@@ -217,4 +230,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, Comment/CommentMeta, media metadata, and draft/publish state proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, category/tag taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, Comment/CommentMeta, media metadata, and draft/publish state proofs. Live kintone credentials are not required.
