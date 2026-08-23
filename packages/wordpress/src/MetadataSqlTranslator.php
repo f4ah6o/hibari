@@ -10,7 +10,18 @@ namespace Hibari\WordPress;
  */
 final class MetadataSqlTranslator {
     private static function sql_string($value) {
-        return str_replace(array("\\'", "\\\\"), array("'", "\\"), $value);
+        // HibariWpdb::_real_escape() uses addslashes() before wpdb emits SQL.
+        // Reverse exactly those escape sequences at the consumer boundary so
+        // opaque values such as PHP-serialized metadata survive round-trips.
+        return strtr(
+            $value,
+            array(
+                "\\0" => "\0",
+                "\\\"" => '"',
+                "\\'" => "'",
+                "\\\\" => "\\",
+            )
+        );
     }
 
     private static function sql_value($token, $sql, $code, $label) {
