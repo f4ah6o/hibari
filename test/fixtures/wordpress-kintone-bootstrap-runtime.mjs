@@ -27,6 +27,14 @@ function wrappedRecord(record, requestedFields) {
   );
 }
 
+function applyWrapped(record, wrapped) {
+  for (const [field, item] of Object.entries(wrapped ?? {})) {
+    if (field === "$id" || field === "$revision") continue;
+    record.fields[field] = item?.value;
+  }
+  record.revision += 1;
+}
+
 function stringEquality(query, field) {
   const escaped = field.replace(/[$]/g, "\\$");
   const match = new RegExp(`${escaped}\\s*=\\s*\"((?:\\\\.|[^\"])*)\"`, "i").exec(query);
@@ -74,6 +82,7 @@ const optionValues = [
 ];
 
 class FakeKintoneBootstrapTransport {
+  #nextOptionId = optionValues.length + 1;
   #nextCursorId = 1;
   #cursors = new Map();
   #records = new Map(
@@ -147,6 +156,41 @@ class FakeKintoneBootstrapTransport {
       return {
         records: records.map((record) => wrappedRecord(record, request.body?.fields))
       };
+    }
+
+    if (request.method === "POST" && request.path.endsWith("/record.json")) {
+      const id = String(this.#nextOptionId++);
+      const record = { id, revision: 1, fields: {} };
+      for (const [field, item] of Object.entries(request.body?.record ?? {})) {
+        record.fields[field] = item?.value;
+      }
+      this.#records.set(id, record);
+      return { id, revision: "1" };
+    }
+
+    if (request.method === "PUT" && request.path.endsWith("/record.json")) {
+      const record = this.#records.get(String(request.body?.id));
+      if (!record) throw new Error(`Unknown fake Kintone Option record ${request.body?.id}`);
+      applyWrapped(record, request.body?.record);
+      return { revision: String(record.revision) };
+    }
+
+    if (request.method === "PUT" && request.path.endsWith("/records.json")) {
+      const returned = [];
+      for (const change of request.body?.records ?? []) {
+        const record = this.#records.get(String(change.id));
+        if (!record) throw new Error(`Unknown fake Kintone Option record ${change.id}`);
+        applyWrapped(record, change.record);
+        returned.push({ id: record.id, revision: String(record.revision) });
+      }
+      return { records: returned };
+    }
+
+    if (request.method === "DELETE" && request.path.endsWith("/records.json")) {
+      for (const id of request.body?.ids ?? []) {
+        this.#records.delete(String(id));
+      }
+      return {};
     }
 
     throw new Error(`Unexpected fake Kintone bootstrap request: ${request.method} ${request.path}`);
