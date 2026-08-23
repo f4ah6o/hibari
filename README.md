@@ -221,7 +221,21 @@ get_post(...)
 
 The draft row is written to the ordinary Post binding, and `wp_publish_post()` lowers through the already-proven update-by-ID path to a mutation containing only `Post.status = publish`. The proof confirms the Post identity, title, content, type, and parent remain stable. Default publish lifecycle callbacks for GUID/cache/term-count/fresh-site maintenance are explicitly isolated in the SHORTINIT harness rather than emulated; notification, revision, plugin/theme, and other publish side effects are not claimed.
 
-Remaining WordPress domains include broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` / `WP_Comment_Query` compatibility, termmeta, term-count/user-count/comment-count maintenance, authentication/security acceptance, and deletion/trash semantics.
+Stock WordPress 7.1 normal bootstrap is now proven without the earlier `SHORTINIT=true` isolation:
+
+```text
+wp-load.php
+  -> wp-settings.php
+  -> Hibari db.php / HibariWpdb
+  -> wp_loaded
+  -> wp_get_theme()
+```
+
+The proof downloads the exact stock WordPress 7.1 tarball, discovers a bundled theme at proof time, supplies `template` / `stylesheet` through ordinary Hibari-backed Options, and verifies WordPress resolves the same existing theme through its own filesystem/theme APIs. Stock WordPress defines `SHORTINIT=false` during this normal bootstrap; the proof verifies that value rather than short-circuiting initialization. In the current evidence run the discovered theme is `twentytwentyfive`, but that slug is not hard-coded into Hibari production code.
+
+Normal bootstrap also exercises WordPress autoload Option preloading, ordinary Option reads/writes, transient storage, and `wp_prime_option_caches()` bounded multi-option reads. Hibari translates only the exact `option_name IN (...)` cache-prime shape into ordinary Option QueryIR. Large serialized block/theme transient values remain opaque and are decoded from SQL with a linear `addslashes()`-inverse scanner rather than a WordPress serialization parser. No Theme/filesystem concept, generic JOIN execution, aggregate engine, or new backend contract is added to core.
+
+Remaining WordPress domains include broader `WP_Query` / `WP_Term_Query` / `WP_User_Query` / `WP_Comment_Query` compatibility, termmeta, term-count/user-count/comment-count maintenance, authentication/security acceptance, deletion/trash semantics, and actual front-page/template rendering.
 
 ## Development
 
@@ -230,4 +244,4 @@ npm install
 npm test
 ```
 
-`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, category/tag taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, Comment/CommentMeta, media metadata, and draft/publish state proofs. Live kintone credentials are not required.
+`npm test` runs core, kintone, Prisma, runtime HTTP, and cross-package contracts. CI additionally downloads pinned stock WordPress 7.1 and runs the database-drop-in, runtime-to-KintoneBackend, Options CRUD, page content CRU, postmeta Dynamic Attributes, category/tag taxonomy Relation Edge, term creation/uniqueness, User/UserMeta, Comment/CommentMeta, media metadata, draft/publish state, and normal full-bootstrap/bundled-theme proofs. Live kintone credentials are not required.
