@@ -146,3 +146,14 @@ jobs:
       - run: php -v
       - run: npm install
       - run: bash packages/wordpress/test/stock-wordpress-tag-taxonomy.sh
+
+  wordpress-full-bootstrap-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: php -v
+      - run: npm install
+      - run: bash packages/wordpress/test/stock-wordpress-full-bootstrap.sh
