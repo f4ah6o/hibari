@@ -13,6 +13,8 @@ final class CompatibilityReport {
     const VERSION = 1;
     const PROFILE = 'wordpress-portable-v0';
 
+    private static $classifications = array('native', 'emulated', 'expensive', 'unsupported');
+
     private static function operation($sql) {
         if (preg_match('/^\s*([A-Za-z]+)/', (string) $sql, $matches)) {
             return strtolower($matches[1]);
@@ -62,14 +64,22 @@ final class CompatibilityReport {
         );
     }
 
+    private static function empty_counts() {
+        return array(
+            'native' => 0,
+            'emulated' => 0,
+            'expensive' => 0,
+            'unsupported' => 0,
+        );
+    }
+
     /**
      * @param array<int, array{id:mixed, sql:mixed, source?:array<string,mixed>}> $cases
      * @return array<string, mixed>
      */
     public static function inspect($cases) {
         $items = array();
-        $portable = 0;
-        $unsupported = 0;
+        $counts = self::empty_counts();
 
         foreach ((array) $cases as $index => $case) {
             if (!is_array($case) || !array_key_exists('id', $case) || !array_key_exists('sql', $case)) {
@@ -82,22 +92,27 @@ final class CompatibilityReport {
 
             try {
                 $plan = SqlPreflight::inspect($sql);
+                if (!in_array($plan->classification, self::$classifications, true)) {
+                    throw new \LogicException('Unknown WordPress compatibility classification: ' . $plan->classification);
+                }
                 $items[] = self::item($case, $plan->classification, $plan->operation, array());
-                ++$portable;
+                ++$counts[$plan->classification];
             } catch (CompatibilityException $exception) {
                 $items[] = self::unsupported_item($case, $sql, $exception);
-                ++$unsupported;
+                ++$counts['unsupported'];
             }
         }
 
         return array(
             'version' => self::VERSION,
             'profile' => self::PROFILE,
-            'compatible' => 0 === $unsupported,
+            'compatible' => 0 === $counts['unsupported'],
             'summary' => array(
                 'total' => count($items),
-                'portable' => $portable,
-                'unsupported' => $unsupported,
+                'native' => $counts['native'],
+                'emulated' => $counts['emulated'],
+                'expensive' => $counts['expensive'],
+                'unsupported' => $counts['unsupported'],
             ),
             'items' => $items,
         );

@@ -18,7 +18,7 @@ function hibari_compatibility_report_assert($condition, $message) {
 
 $cases = array(
     array(
-        'id' => 'portable-option-read',
+        'id' => 'native-option-read',
         'sql' => "SELECT option_value FROM wp_options WHERE option_name = 'siteurl' LIMIT 1",
     ),
     array(
@@ -52,8 +52,12 @@ hibari_compatibility_report_assert(false !== $golden, 'Unable to read compatibil
 hibari_compatibility_report_assert($golden === $json, 'Compatibility report golden output changed.');
 hibari_compatibility_report_assert(false === $report['compatible'], 'Unsupported cases must mark the whole report incompatible.');
 hibari_compatibility_report_assert(
-    array('total' => 6, 'portable' => 1, 'unsupported' => 5) === $report['summary'],
+    array('total' => 6, 'native' => 1, 'emulated' => 0, 'expensive' => 0, 'unsupported' => 5) === $report['summary'],
     'Compatibility report summary counts changed.'
+);
+hibari_compatibility_report_assert(
+    'native' === $report['items'][0]['classification'],
+    'Successful WordPress SQL must use the canonical native classification.'
 );
 
 $codes = array();
@@ -80,4 +84,4 @@ hibari_compatibility_report_assert(
 );
 
 echo $json;
-echo "WordPress compatibility report stable diagnostics proof: ok\n";
+echo "WordPress compatibility report canonical classification proof: ok\n";
