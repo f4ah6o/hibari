@@ -2,7 +2,7 @@
 
 ## Status
 
-Open
+Open — implementation `9319b69f5f73abe3d0e8c29c4ecddafb491ebed0` under full-CI verification.
 
 ## Parent
 
