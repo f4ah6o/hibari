@@ -1,0 +1,83 @@
+{
+    "version": 1,
+    "profile": "wordpress-portable-v0",
+    "compatible": false,
+    "summary": {
+        "total": 6,
+        "portable": 1,
+        "unsupported": 5
+    },
+    "items": [
+        {
+            "id": "portable-option-read",
+            "classification": "portable",
+            "operation": "select",
+            "diagnostics": []
+        },
+        {
+            "id": "unsupported-join",
+            "classification": "unsupported",
+            "operation": "select",
+            "diagnostics": [
+                {
+                    "code": "HIB-WP-JOIN-001",
+                    "severity": "error",
+                    "capability": "query.join",
+                    "message": "JOIN semantics are not part of the initial portable WordPress SQL subset."
+                }
+            ]
+        },
+        {
+            "id": "unsupported-aggregate",
+            "classification": "unsupported",
+            "operation": "select",
+            "diagnostics": [
+                {
+                    "code": "HIB-WP-AGG-001",
+                    "severity": "error",
+                    "capability": "query.aggregate",
+                    "message": "Aggregate SQL is not part of the initial portable WordPress SQL subset."
+                }
+            ]
+        },
+        {
+            "id": "unsupported-transaction",
+            "classification": "unsupported",
+            "operation": "start",
+            "diagnostics": [
+                {
+                    "code": "HIB-WP-TXN-001",
+                    "severity": "error",
+                    "capability": "transaction.interactive",
+                    "message": "Interactive transaction SQL is outside the portable Hibari WordPress profile."
+                }
+            ]
+        },
+        {
+            "id": "unsupported-ddl",
+            "classification": "unsupported",
+            "operation": "create",
+            "diagnostics": [
+                {
+                    "code": "HIB-WP-DDL-001",
+                    "severity": "error",
+                    "capability": "schema.migration",
+                    "message": "Schema and DDL SQL is not executable through the Hibari WordPress runtime profile."
+                }
+            ]
+        },
+        {
+            "id": "unsupported-subquery",
+            "classification": "unsupported",
+            "operation": "select",
+            "diagnostics": [
+                {
+                    "code": "HIB-WP-SUBQUERY-001",
+                    "severity": "error",
+                    "capability": "query.subquery",
+                    "message": "Subqueries are not part of the initial portable WordPress SQL subset."
+                }
+            ]
+        }
+    ]
+}
