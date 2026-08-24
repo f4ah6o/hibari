@@ -79,6 +79,7 @@ $core_files = array(
     'wp-includes/kses.php',
     'wp-includes/cron.php',
     'wp-includes/post.php',
+    'wp-includes/post-formats.php',
     'wp-includes/class-wp-post-type.php',
     'wp-includes/class-wp-post.php',
     'wp-includes/revision.php',
