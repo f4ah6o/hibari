@@ -5,9 +5,9 @@ namespace Hibari\WordPress;
 /**
  * Deterministic compatibility report over explicit SQL cases.
  *
- * Source/plugin discovery belongs to a later tooling layer. This contract only
- * converts the existing WordPress consumer preflight result into a stable,
- * machine-readable shape and never crosses the runtime/backend bridge.
+ * Discovery belongs to a separate tooling layer. This contract converts the
+ * existing WordPress consumer preflight result into a stable, machine-readable
+ * shape and never crosses the runtime/backend bridge.
  */
 final class CompatibilityReport {
     const VERSION = 1;
@@ -20,24 +20,50 @@ final class CompatibilityReport {
         return 'unknown';
     }
 
-    private static function unsupported_item($id, $sql, $exception) {
-        return array(
-            'id' => (string) $id,
-            'classification' => 'unsupported',
-            'operation' => self::operation($sql),
-            'diagnostics' => array(
+    private static function source($case) {
+        if (!isset($case['source']) || !is_array($case['source']) || !isset($case['source']['file'])) {
+            return null;
+        }
+
+        $source = array('file' => (string) $case['source']['file']);
+        if (isset($case['source']['line'])) {
+            $source['line'] = (int) $case['source']['line'];
+        }
+        return $source;
+    }
+
+    private static function item($case, $classification, $operation, $diagnostics) {
+        $item = array(
+            'id' => (string) $case['id'],
+            'classification' => $classification,
+            'operation' => $operation,
+        );
+        $source = self::source($case);
+        if (null !== $source) {
+            $item['source'] = $source;
+        }
+        $item['diagnostics'] = $diagnostics;
+        return $item;
+    }
+
+    private static function unsupported_item($case, $sql, $exception) {
+        return self::item(
+            $case,
+            'unsupported',
+            self::operation($sql),
+            array(
                 array(
                     'code' => $exception->diagnostic_code,
                     'severity' => 'error',
                     'capability' => $exception->capability,
                     'message' => $exception->getMessage(),
                 ),
-            ),
+            )
         );
     }
 
     /**
-     * @param array<int, array{id:mixed, sql:mixed}> $cases
+     * @param array<int, array{id:mixed, sql:mixed, source?:array<string,mixed>}> $cases
      * @return array<string, mixed>
      */
     public static function inspect($cases) {
@@ -52,20 +78,14 @@ final class CompatibilityReport {
                 );
             }
 
-            $id = (string) $case['id'];
             $sql = (string) $case['sql'];
 
             try {
                 $plan = SqlPreflight::inspect($sql);
-                $items[] = array(
-                    'id' => $id,
-                    'classification' => $plan->classification,
-                    'operation' => $plan->operation,
-                    'diagnostics' => array(),
-                );
+                $items[] = self::item($case, $plan->classification, $plan->operation, array());
                 ++$portable;
             } catch (CompatibilityException $exception) {
-                $items[] = self::unsupported_item($id, $sql, $exception);
+                $items[] = self::unsupported_item($case, $sql, $exception);
                 ++$unsupported;
             }
         }

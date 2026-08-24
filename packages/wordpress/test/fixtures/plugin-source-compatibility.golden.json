@@ -1,0 +1,55 @@
+{
+    "version": 1,
+    "profile": "wordpress-plugin-static-v0",
+    "complete": false,
+    "compatible": false,
+    "summary": {
+        "files": 1,
+        "sqlCases": 2,
+        "portable": 1,
+        "unsupported": 1,
+        "uninspectable": 1
+    },
+    "items": [
+        {
+            "id": "hibari-fixture-plugin.php:6:get_var:1",
+            "classification": "portable",
+            "operation": "select",
+            "source": {
+                "file": "hibari-fixture-plugin.php",
+                "line": 6
+            },
+            "diagnostics": []
+        },
+        {
+            "id": "hibari-fixture-plugin.php:10:get_results:2",
+            "classification": "unsupported",
+            "operation": "select",
+            "source": {
+                "file": "hibari-fixture-plugin.php",
+                "line": 10
+            },
+            "diagnostics": [
+                {
+                    "code": "HIB-WP-JOIN-001",
+                    "severity": "error",
+                    "capability": "query.join",
+                    "message": "JOIN semantics are not part of the initial portable WordPress SQL subset."
+                }
+            ]
+        }
+    ],
+    "diagnostics": [
+        {
+            "id": "hibari-fixture-plugin.php:15:query:3",
+            "code": "HIB-WP-SCAN-001",
+            "severity": "warning",
+            "capability": "wordpress.staticSql",
+            "message": "SQL argument for $wpdb->query() is not a static literal and cannot be inspected without execution.",
+            "source": {
+                "file": "hibari-fixture-plugin.php",
+                "line": 15
+            }
+        }
+    ]
+}
