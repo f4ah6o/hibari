@@ -2,7 +2,7 @@
 
 ## Status
 
-Open
+Closed
 
 ## Parent
 
@@ -42,14 +42,14 @@ Stable diagnostics:
 
 ## Acceptance criteria
 
-- [ ] reusable backend-neutral `checkSchemaDrift(expected, actual)` exists in core
-- [ ] identical/compatible schema produces no diagnostics
-- [ ] diagnostics are deterministic by expected model/field order
-- [ ] stable schema diagnostic codes carry model/field path and details
-- [ ] no concrete backend metadata is required by the diff implementation
-- [ ] kintone introspection output can be checked through the same core function
-- [ ] drift is detected without issuing record CRUD requests
-- [ ] existing core/kintone/Prisma/WordPress proofs remain green
+- [x] reusable backend-neutral `checkSchemaDrift(expected, actual)` exists in core
+- [x] identical/compatible schema produces no diagnostics
+- [x] diagnostics are deterministic by expected model/field order
+- [x] stable schema diagnostic codes carry model/field path and details
+- [x] no concrete backend metadata is required by the diff implementation
+- [x] kintone introspection output can be checked through the same core function
+- [x] drift is detected without issuing record CRUD requests
+- [x] existing core/kintone/Prisma/WordPress proofs remain green
 
 ## Guardrails
 
@@ -59,8 +59,11 @@ Stable diagnostics:
 - no equality requirement for backend extension metadata
 - no strict-mode policy yet; this child produces drift evidence only
 
-## Completion evidence required
+## Completion evidence
 
-- core contract tests for each stable diagnostic family
-- kintone introspection-to-core drift proof
-- full CI run and revision
+- implementation revision: `1d5fd3b6c3e5a1855b47c89a4c3eae81d600e6a2`
+- core contract tests cover `HIB-SCHEMA-001` through `HIB-SCHEMA-005`
+- kintone `schemaFromFormFields()` output is checked through the same core `checkSchemaDrift()` path
+- no schema mutation or record CRUD is performed by the drift checker
+- GitHub Actions CI run `32689800178` / run #258 completed successfully
+- all 16 CI jobs completed with `success`, including `test` and all WordPress proof jobs
