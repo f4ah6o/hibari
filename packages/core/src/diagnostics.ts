@@ -5,7 +5,12 @@ export const diagnosticCodes = {
   emulatedCapability: "HIB-CAP-002",
   capabilityLimitExceeded: "HIB-LIMIT-001",
   capabilityLimitApproaching: "HIB-COST-001",
-  highRequestCost: "HIB-COST-002"
+  highRequestCost: "HIB-COST-002",
+  schemaModelMissing: "HIB-SCHEMA-001",
+  schemaFieldMissing: "HIB-SCHEMA-002",
+  schemaFieldIncompatible: "HIB-SCHEMA-003",
+  schemaIdentifierMismatch: "HIB-SCHEMA-004",
+  schemaConcurrencyMismatch: "HIB-SCHEMA-005"
 } as const;
 
 export type CoreDiagnosticCode = (typeof diagnosticCodes)[keyof typeof diagnosticCodes];
