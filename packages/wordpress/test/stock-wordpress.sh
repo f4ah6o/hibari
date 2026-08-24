@@ -11,6 +11,8 @@ for php_file in "$package_root"/db.php "$package_root"/src/*.php "$package_root"
   php -l "$php_file" >/dev/null
 done
 
+php "$package_root/test/compatibility-report.php"
+
 curl -fsSL "https://wordpress.org/wordpress-${wordpress_version}.tar.gz" -o "$tmp/wordpress.tar.gz"
 tar -xzf "$tmp/wordpress.tar.gz" -C "$tmp"
 
