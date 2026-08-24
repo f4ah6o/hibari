@@ -104,6 +104,6 @@ final class SqlPreflight {
             );
         }
 
-        return new SqlPlan('portable', strtolower($matches[1]));
+        return new SqlPlan('native', strtolower($matches[1]));
     }
 }

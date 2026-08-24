@@ -6,14 +6,16 @@
     "summary": {
         "files": 1,
         "sqlCases": 2,
-        "portable": 1,
+        "native": 1,
+        "emulated": 0,
+        "expensive": 0,
         "unsupported": 1,
         "uninspectable": 1
     },
     "items": [
         {
             "id": "hibari-fixture-plugin.php:6:get_var:1",
-            "classification": "portable",
+            "classification": "native",
             "operation": "select",
             "source": {
                 "file": "hibari-fixture-plugin.php",

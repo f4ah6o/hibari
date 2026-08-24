@@ -256,7 +256,9 @@ final class PluginCompatibilityScanner {
             'summary' => array(
                 'files' => count($files),
                 'sqlCases' => $report['summary']['total'],
-                'portable' => $report['summary']['portable'],
+                'native' => $report['summary']['native'],
+                'emulated' => $report['summary']['emulated'],
+                'expensive' => $report['summary']['expensive'],
                 'unsupported' => $report['summary']['unsupported'],
                 'uninspectable' => count($diagnostics),
             ),

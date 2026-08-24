@@ -10,9 +10,12 @@ trap 'rm -rf "$tmp"' EXIT
 for php_file in "$package_root"/db.php "$package_root"/src/*.php "$package_root"/test/*.php; do
   php -l "$php_file" >/dev/null
 done
+php -l "$package_root/bin/check-plugin.php" >/dev/null
 
 php "$package_root/test/compatibility-report.php"
 php "$package_root/test/plugin-compatibility-check.php"
+php "$package_root/test/compatibility-policy.php"
+bash "$package_root/test/ci-strict-mode.sh"
 
 curl -fsSL "https://wordpress.org/wordpress-${wordpress_version}.tar.gz" -o "$tmp/wordpress.tar.gz"
 tar -xzf "$tmp/wordpress.tar.gz" -C "$tmp"

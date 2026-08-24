@@ -4,13 +4,15 @@
     "compatible": false,
     "summary": {
         "total": 6,
-        "portable": 1,
+        "native": 1,
+        "emulated": 0,
+        "expensive": 0,
         "unsupported": 5
     },
     "items": [
         {
-            "id": "portable-option-read",
-            "classification": "portable",
+            "id": "native-option-read",
+            "classification": "native",
             "operation": "select",
             "diagnostics": []
         },

@@ -36,13 +36,19 @@ hibari_plugin_scan_assert(
     array(
         'files' => 1,
         'sqlCases' => 2,
-        'portable' => 1,
+        'native' => 1,
+        'emulated' => 0,
+        'expensive' => 0,
         'unsupported' => 1,
         'uninspectable' => 1,
     ) === $report['summary'],
     'Plugin compatibility scan summary changed.'
 );
 
+hibari_plugin_scan_assert(
+    'native' === $report['items'][0]['classification'],
+    'Portable source SQL must be reported with the canonical native classification.'
+);
 hibari_plugin_scan_assert(
     'HIB-WP-JOIN-001' === $report['items'][1]['diagnostics'][0]['code'],
     'Unsupported source SQL lost the stable JOIN diagnostic.'
@@ -61,4 +67,4 @@ hibari_plugin_scan_assert(
 );
 
 echo $json;
-echo "WordPress plugin static compatibility check proof: ok\n";
+echo "WordPress plugin static canonical compatibility check proof: ok\n";
